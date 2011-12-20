@@ -46,6 +46,10 @@ import java.awt.event.KeyEvent;
 import java.awt.Toolkit;
 import javax.swing.JMenuBar;
 import javax.swing.JTabbedPane;
+import javax.swing.JPanel;
+import javax.swing.JMenu;
+import javax.swing.JMenuItem;
+import javax.swing.JTextPane;
 
 public class MonkeyBoard {
 	private DefaultListModel listModel = new DefaultListModel();
@@ -342,7 +346,7 @@ public class MonkeyBoard {
 		frmMonkeyboard = new JFrame();
 		frmMonkeyboard.setTitle("MonkeyBoard");
 		frmMonkeyboard.setResizable(false);
-		frmMonkeyboard.setBounds(100, 100, 492, 382);
+		frmMonkeyboard.setBounds(100, 100, 438, 443);
 		frmMonkeyboard.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		
 		// moved JList declaration to class-level declarartions
@@ -358,6 +362,10 @@ public class MonkeyBoard {
 		});
 		
 		JButton btnConnect = new JButton("Connect");
+		btnConnect.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+			}
+		});
 		btnConnect.addMouseListener(new MouseAdapter() {
 			@Override
 			public void mouseClicked(MouseEvent e) {
@@ -370,9 +378,9 @@ public class MonkeyBoard {
 			}
 		});
 		
-		JLabel lblAdbDevices = new JLabel("adb devices");
-		
 		btnMonkeyBoard = new JButton("");
+		btnMonkeyBoard.setBorderPainted(false);
+		btnMonkeyBoard.setIconTextGap(0);
 		btnMonkeyBoard.setPressedIcon(new ImageIcon(MonkeyBoard.class.getResource("/res/android_large_sel.png")));
 		btnMonkeyBoard.setSelectedIcon(new ImageIcon(MonkeyBoard.class.getResource("/res/android_large_sel.png")));
 		btnMonkeyBoard.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
@@ -404,10 +412,14 @@ public class MonkeyBoard {
 				btnMonkeyBoard.setSelected(true);
 			}
 		});	
-		btnMonkeyBoard.setBorder(new BevelBorder(BevelBorder.LOWERED, null, null, null, null));
+		btnMonkeyBoard.setBorder(null);
 		btnMonkeyBoard.setIcon(new ImageIcon(MonkeyBoard.class.getResource("/res/android_large.png")));
 		
-		lblOutput = new JLabel(">");
+		JTextPane textConsole = new JTextPane();
+		textConsole.setText(">>>");
+		textConsole.setForeground(Color.GREEN);
+		textConsole.setBackground(Color.BLACK);
+		textConsole.setBorder(new BevelBorder(BevelBorder.LOWERED, null, null, null, null));
 
 		GroupLayout groupLayout = new GroupLayout(frmMonkeyboard.getContentPane());
 		groupLayout.setHorizontalGroup(
@@ -415,37 +427,65 @@ public class MonkeyBoard {
 				.addGroup(groupLayout.createSequentialGroup()
 					.addContainerGap()
 					.addGroup(groupLayout.createParallelGroup(Alignment.LEADING)
-						.addComponent(listView, GroupLayout.DEFAULT_SIZE, 193, Short.MAX_VALUE)
+						.addComponent(textConsole)
 						.addGroup(groupLayout.createSequentialGroup()
-							.addComponent(btnRefresh)
-							.addPreferredGap(ComponentPlacement.RELATED)
-							.addComponent(btnConnect))
-						.addComponent(lblAdbDevices, GroupLayout.DEFAULT_SIZE, 193, Short.MAX_VALUE))
-					.addPreferredGap(ComponentPlacement.RELATED)
-					.addGroup(groupLayout.createParallelGroup(Alignment.LEADING)
-						.addComponent(lblOutput, GroupLayout.DEFAULT_SIZE, 281, Short.MAX_VALUE)
-						.addComponent(btnMonkeyBoard, GroupLayout.DEFAULT_SIZE, 281, Short.MAX_VALUE))
+							.addGroup(groupLayout.createParallelGroup(Alignment.LEADING, false)
+								.addGroup(groupLayout.createSequentialGroup()
+									.addComponent(btnRefresh)
+									.addPreferredGap(ComponentPlacement.RELATED)
+									.addComponent(btnConnect))
+								.addComponent(listView, GroupLayout.DEFAULT_SIZE, GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+							.addPreferredGap(ComponentPlacement.UNRELATED)
+							.addComponent(btnMonkeyBoard, GroupLayout.PREFERRED_SIZE, 219, GroupLayout.PREFERRED_SIZE)))
 					.addContainerGap())
 		);
 		groupLayout.setVerticalGroup(
-			groupLayout.createParallelGroup(Alignment.TRAILING)
+			groupLayout.createParallelGroup(Alignment.LEADING)
 				.addGroup(groupLayout.createSequentialGroup()
-					.addGap(11)
-					.addComponent(lblAdbDevices)
-					.addPreferredGap(ComponentPlacement.RELATED)
+					.addContainerGap()
 					.addGroup(groupLayout.createParallelGroup(Alignment.TRAILING)
-						.addComponent(btnMonkeyBoard, GroupLayout.DEFAULT_SIZE, 264, Short.MAX_VALUE)
-						.addComponent(listView, GroupLayout.DEFAULT_SIZE, 264, Short.MAX_VALUE))
+						.addGroup(groupLayout.createSequentialGroup()
+							.addComponent(listView, GroupLayout.PREFERRED_SIZE, 234, GroupLayout.PREFERRED_SIZE)
+							.addPreferredGap(ComponentPlacement.RELATED, GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+							.addGroup(groupLayout.createParallelGroup(Alignment.BASELINE)
+								.addComponent(btnRefresh)
+								.addComponent(btnConnect)))
+						.addComponent(btnMonkeyBoard))
 					.addPreferredGap(ComponentPlacement.RELATED)
-					.addGroup(groupLayout.createParallelGroup(Alignment.LEADING)
-						.addComponent(lblOutput, GroupLayout.DEFAULT_SIZE, 29, Short.MAX_VALUE)
-						.addComponent(btnRefresh, GroupLayout.DEFAULT_SIZE, GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-						.addComponent(btnConnect, GroupLayout.DEFAULT_SIZE, GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+					.addComponent(textConsole, GroupLayout.PREFERRED_SIZE, 113, GroupLayout.PREFERRED_SIZE)
 					.addContainerGap())
 		);
 		frmMonkeyboard.getContentPane().setLayout(groupLayout);
 		
 		JMenuBar menuBar = new JMenuBar();
+		menuBar.setBorder(null);
 		frmMonkeyboard.setJMenuBar(menuBar);
+		
+		JMenu mnActions = new JMenu("Actions");
+		menuBar.add(mnActions);
+		
+		JMenuItem mntmRefreshDeviceList = new JMenuItem("Refresh Device List");
+		mnActions.add(mntmRefreshDeviceList);
+		
+		JMenuItem mntmConnectToDevice = new JMenuItem("Connect To Device");
+		mnActions.add(mntmConnectToDevice);
+		
+		JMenuItem mntmInstallapk = new JMenuItem("Install *.apk...");
+		mnActions.add(mntmInstallapk);
+		
+		JMenuItem mntmUninstallPackage = new JMenuItem("Uninstall Package...");
+		mnActions.add(mntmUninstallPackage);
+		
+		JMenuItem mntmExecuteShellCommand = new JMenuItem("Execute Shell Command...");
+		mnActions.add(mntmExecuteShellCommand);
+		
+		JMenuItem mntmSaveScreenshot = new JMenuItem("Save Screenshot");
+		mnActions.add(mntmSaveScreenshot);
+		
+		JMenuItem mntmSaveScreenshotAs = new JMenuItem("Save Screenshot As...");
+		mnActions.add(mntmSaveScreenshotAs);
+		
+		JMenuItem mntmExit = new JMenuItem("Exit");
+		mnActions.add(mntmExit);
 	}
 }
