@@ -44,12 +44,14 @@ import java.awt.Frame;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.awt.Toolkit;
+import javax.swing.JMenuBar;
+import javax.swing.JTabbedPane;
 
 public class MonkeyBoard {
 	private DefaultListModel listModel = new DefaultListModel();
 	private JList listView = null;
 	private JButton btnMonkeyBoard = null;
-
+	private JLabel lblOutput = null;
 	
     private static final String ADB = "/Users/obartley/Library/android-sdk-macosx-r15/platform-tools/adb";
 	private String connectedDeviceId = null; 
@@ -68,14 +70,14 @@ public class MonkeyBoard {
 	public MonkeyBoard() {
 		initialize();
 
-		// set up the timer to refresh the device list
-		ActionListener timerTick = new ActionListener() {
-		      public void actionPerformed(ActionEvent e) {
-		          refreshDeviceList();
-		      }
-		};
-		new Timer(REFRESH_INTERVAL, timerTick).start();
-		
+//		// set up the timer to refresh the device list
+//		ActionListener timerTick = new ActionListener() {
+//		      public void actionPerformed(ActionEvent e) {
+//		          refreshDeviceList();
+//		      }
+//		};
+//		new Timer(REFRESH_INTERVAL, timerTick).start();
+		refreshDeviceList();
 		TreeMap<String, String> options = new TreeMap<String, String>();
         options.put("backend", "adb");
         options.put("adbLocation", ADB);
@@ -307,7 +309,7 @@ public class MonkeyBoard {
 //		          case KeyEvent.VK_BUTTON_SELECT: code = "KEYCODE_BUTTON_SELECT";
 //		          case KeyEvent.VK_BUTTON_MODE: code = "KEYCODE_BUTTON_MODE";
 		      }
-		      System.out.println(code);
+		      lblOutput.setText("> [" + Integer.toString(keyCode) + ":" + Integer.toString(modifiers) + "]" + code);
 		      mDevice.press(code, TouchPressType.DOWN_AND_UP);//down?MonkeyDevice.DOWN : MonkeyDevice.UP);
 		 
 		} 
@@ -338,7 +340,6 @@ public class MonkeyBoard {
 	 */
 	private void initialize() {
 		frmMonkeyboard = new JFrame();
-		frmMonkeyboard.setIconImage(Toolkit.getDefaultToolkit().getImage(MonkeyBoard.class.getResource("/res/android_device.png")));
 		frmMonkeyboard.setTitle("MonkeyBoard");
 		frmMonkeyboard.setResizable(false);
 		frmMonkeyboard.setBounds(100, 100, 492, 382);
@@ -372,34 +373,41 @@ public class MonkeyBoard {
 		JLabel lblAdbDevices = new JLabel("adb devices");
 		
 		btnMonkeyBoard = new JButton("");
-		btnMonkeyBoard.setPressedIcon(new ImageIcon(MonkeyBoard.class.getResource("/res/android_icon_sel.png")));
-		btnMonkeyBoard.setSelectedIcon(new ImageIcon(MonkeyBoard.class.getResource("/res/android_icon_sel.png")));
+		btnMonkeyBoard.setPressedIcon(new ImageIcon(MonkeyBoard.class.getResource("/res/android_large_sel.png")));
+		btnMonkeyBoard.setSelectedIcon(new ImageIcon(MonkeyBoard.class.getResource("/res/android_large_sel.png")));
 		btnMonkeyBoard.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 		btnMonkeyBoard.addKeyListener(new KeyAdapter() {
 			@Override
 			public void keyPressed(KeyEvent e) {
-				keyPressStatus++;
-				btnMonkeyBoard.setSelected(true);
+//				keyPressStatus++;
+//				btnMonkeyBoard.setSelected(true);
 				
 				sendKeyToDevice(e.getKeyCode(), e.getModifiers());
 			}
 			@Override
 			public void keyReleased(KeyEvent e) {
-				keyPressStatus--;
-				if ( keyPressStatus <= 0 ) {
-					btnMonkeyBoard.setSelected(false);
-				}
+//				keyPressStatus--;
+//				if ( keyPressStatus <= 0 ) {
+//					btnMonkeyBoard.setSelected(false);
+//				}
 			}
 		});
 		btnMonkeyBoard.addFocusListener(new FocusAdapter() {
 			@Override
 			public void focusLost(FocusEvent arg0) {
-				keyPressStatus = 0;
+				//keyPressStatus = 0;
 				btnMonkeyBoard.setSelected(false);
+			}
+			@Override
+			public void focusGained(FocusEvent arg0) {
+				//keyPressStatus = 0;
+				btnMonkeyBoard.setSelected(true);
 			}
 		});	
 		btnMonkeyBoard.setBorder(new BevelBorder(BevelBorder.LOWERED, null, null, null, null));
-		btnMonkeyBoard.setIcon(new ImageIcon(MonkeyBoard.class.getResource("/res/android_icon.png")));
+		btnMonkeyBoard.setIcon(new ImageIcon(MonkeyBoard.class.getResource("/res/android_large.png")));
+		
+		lblOutput = new JLabel(">");
 
 		GroupLayout groupLayout = new GroupLayout(frmMonkeyboard.getContentPane());
 		groupLayout.setHorizontalGroup(
@@ -414,25 +422,30 @@ public class MonkeyBoard {
 							.addComponent(btnConnect))
 						.addComponent(lblAdbDevices, GroupLayout.DEFAULT_SIZE, 193, Short.MAX_VALUE))
 					.addPreferredGap(ComponentPlacement.RELATED)
-					.addComponent(btnMonkeyBoard, GroupLayout.PREFERRED_SIZE, 281, GroupLayout.PREFERRED_SIZE)
+					.addGroup(groupLayout.createParallelGroup(Alignment.LEADING)
+						.addComponent(lblOutput, GroupLayout.DEFAULT_SIZE, 281, Short.MAX_VALUE)
+						.addComponent(btnMonkeyBoard, GroupLayout.DEFAULT_SIZE, 281, Short.MAX_VALUE))
 					.addContainerGap())
 		);
 		groupLayout.setVerticalGroup(
 			groupLayout.createParallelGroup(Alignment.TRAILING)
 				.addGroup(groupLayout.createSequentialGroup()
-					.addContainerGap()
+					.addGap(11)
+					.addComponent(lblAdbDevices)
+					.addPreferredGap(ComponentPlacement.RELATED)
 					.addGroup(groupLayout.createParallelGroup(Alignment.TRAILING)
-						.addComponent(btnMonkeyBoard, Alignment.LEADING, GroupLayout.DEFAULT_SIZE, 348, Short.MAX_VALUE)
-						.addGroup(groupLayout.createSequentialGroup()
-							.addComponent(lblAdbDevices)
-							.addPreferredGap(ComponentPlacement.RELATED)
-							.addComponent(listView, GroupLayout.DEFAULT_SIZE, 291, Short.MAX_VALUE)
-							.addPreferredGap(ComponentPlacement.RELATED)
-							.addGroup(groupLayout.createParallelGroup(Alignment.BASELINE)
-								.addComponent(btnRefresh)
-								.addComponent(btnConnect))))
+						.addComponent(btnMonkeyBoard, GroupLayout.DEFAULT_SIZE, 264, Short.MAX_VALUE)
+						.addComponent(listView, GroupLayout.DEFAULT_SIZE, 264, Short.MAX_VALUE))
+					.addPreferredGap(ComponentPlacement.RELATED)
+					.addGroup(groupLayout.createParallelGroup(Alignment.LEADING)
+						.addComponent(lblOutput, GroupLayout.DEFAULT_SIZE, 29, Short.MAX_VALUE)
+						.addComponent(btnRefresh, GroupLayout.DEFAULT_SIZE, GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+						.addComponent(btnConnect, GroupLayout.DEFAULT_SIZE, GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
 					.addContainerGap())
 		);
 		frmMonkeyboard.getContentPane().setLayout(groupLayout);
+		
+		JMenuBar menuBar = new JMenuBar();
+		frmMonkeyboard.setJMenuBar(menuBar);
 	}
 }
