@@ -8,6 +8,8 @@ import javax.swing.JButton;
 import javax.swing.DefaultListModel;
 import javax.swing.GroupLayout;
 import javax.swing.GroupLayout.Alignment;
+import javax.swing.JSeparator;
+import javax.swing.KeyStroke;
 import javax.swing.LayoutStyle.ComponentPlacement;
 import javax.swing.JLabel;
 import javax.swing.ImageIcon;
@@ -39,7 +41,11 @@ import java.awt.event.ActionEvent;
 import javax.swing.border.MatteBorder;
 import javax.swing.border.BevelBorder;
 import javax.swing.border.CompoundBorder;
+import javax.swing.text.Document;
+import javax.swing.text.SimpleAttributeSet;
+
 import java.awt.Cursor;
+import java.awt.Event;
 import java.awt.Frame;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
@@ -50,22 +56,30 @@ import javax.swing.JPanel;
 import javax.swing.JMenu;
 import javax.swing.JMenuItem;
 import javax.swing.JTextPane;
+import java.awt.Dimension;
+import java.awt.Component;
+import javax.swing.SwingConstants;
+import java.awt.Font;
+import javax.swing.JScrollPane;
+import java.awt.event.InputEvent;
 
 public class MonkeyBoard {
 	private DefaultListModel listModel = new DefaultListModel();
 	private JList listView = null;
 	private JButton btnMonkeyBoard = null;
-	private JLabel lblOutput = null;
-	
-    private static final String ADB = "/Users/obartley/Library/android-sdk-macosx-r15/platform-tools/adb";
-	private String connectedDeviceId = null; 
-    private static final long TIMEOUT = 5000;
-    private static final int REFRESH_INTERVAL = 3000;
-    private ChimpChat mChimpChat;
-    private IChimpDevice mDevice; 
-	
+	private JTextPane textConsole = null;
 	private JFrame frmMonkeyboard;
 	
+    private static final String ANDROID_SDK = "/Users/obartley/Library/android-sdk-macosx-r15/";
+    private static final String ADB = ANDROID_SDK + "platform-tools/adb";
+    
+    private static final long TIMEOUT = 5000;
+    private static final int REFRESH_INTERVAL = 3000;
+    
+    private ChimpChat mChimpChat;
+    private IChimpDevice mDevice; 
+    private String connectedDeviceId = null;
+    
 	private int keyPressStatus; //increased everytime there's a keyPress event, -- on keyReleased	
 	
 	/**
@@ -89,6 +103,18 @@ public class MonkeyBoard {
 		
 		
 	}
+	
+	public void toConsole(String arg0) {
+		try {
+			Document d = textConsole.getDocument();
+			SimpleAttributeSet attributes = new SimpleAttributeSet();
+			d.insertString(d.getLength(), '\n' + arg0, attributes);
+		} catch (Exception e) {
+			System.err.println("Error instering:" + arg0);
+			e.printStackTrace();
+		}
+	}
+	
 	private Map<String, String> getAdbStatus() {
 		Map<String, String> rv = new HashMap<String, String>();
 		// Capture output from `adb devices` and map connected deviceIds to their status
@@ -118,8 +144,6 @@ public class MonkeyBoard {
 			while ((line=buf.readLine())!=null) {
 				
 				if ( ! (line.startsWith("List") || line.length() <= 1) ) {
-					//TODO: replace with Log
-
 					String[] s = line.split("\\s+"); //it's a tab separated list, dude!
 					//System.out.println(line + ":" + Integer.toString(s.length));
 					rv.put(s[0], s[1]); // add deviceId, status to Map
@@ -183,7 +207,7 @@ public class MonkeyBoard {
 	private void connectToDevice(String deviceId) {
 		//TODO: maybe make this threaded, so an unresponsive emulator/device
 		// doesn't block the main thread
-		System.out.println("Connecting to: " + deviceId);
+		toConsole("Connecting to: " + deviceId);
 		try {
 	        mDevice = mChimpChat.waitForConnection(TIMEOUT, deviceId);
 	        if ( mDevice == null ) {
@@ -201,121 +225,11 @@ public class MonkeyBoard {
 	}
 	
 	private void sendKeyToDevice(int keyCode, int modifiers) {
+		String code = KeyCodeTable.lookup(keyCode, modifiers);
+		      
+		toConsole("[" + Integer.toString(keyCode) + ":" + Integer.toString(modifiers) + "]" + code);
 		if (this.connectedDeviceId != null) {
-		      String code = "KEYCODE_UNKNOWN";
-		      switch(keyCode){
-		          //case KeyEvent.VK_SOFT_LEFT: code = "KEYCODE_SOFT_LEFT";
-		          //case KeyEvent.VK_SOFT_RIGHT: code = "KEYCODE_SOFT_RIGHT";
-		          case KeyEvent.VK_HOME: code = "KEYCODE_HOME"; break;
-		          case KeyEvent.VK_ESCAPE: code = "KEYCODE_BACK"; break;
-		          //case KeyEvent.VK_CALL: code = "KEYCODE_CALL";
-		          //case KeyEvent.VK_ENDCALL: code = "KEYCODE_ENDCALL";
-		          case KeyEvent.VK_0: code = "KEYCODE_0"; break;
-		          case KeyEvent.VK_1: code = "KEYCODE_1"; break;
-		          case KeyEvent.VK_2: code = "KEYCODE_2"; break;
-		          case KeyEvent.VK_3: code = "KEYCODE_3"; break;
-		          case KeyEvent.VK_4: code = "KEYCODE_4"; break;
-		          case KeyEvent.VK_5: code = "KEYCODE_5"; break;
-		          case KeyEvent.VK_6: code = "KEYCODE_6"; break;
-		          case KeyEvent.VK_7: code = "KEYCODE_7"; break;
-		          case KeyEvent.VK_8: code = "KEYCODE_8"; break;
-		          case KeyEvent.VK_9: code = "KEYCODE_9"; break;
-		          //case KeyEvent.VK_STAR: code = "KEYCODE_STAR";
-		          //case KeyEvent.VK_POUND: code = "KEYCODE_POUND";
-		          case KeyEvent.VK_UP: code = "KEYCODE_DPAD_UP"; break;
-		          case KeyEvent.VK_DOWN: code = "KEYCODE_DPAD_DOWN"; break;
-		          case KeyEvent.VK_LEFT: code = "KEYCODE_DPAD_LEFT"; break;
-		          case KeyEvent.VK_RIGHT: code = "KEYCODE_DPAD_RIGHT"; break;
-		          //case KeyEvent.VK_ENTER: code = "KEYCODE_DPAD_CENTER";
-		          //case KeyEvent.VK_VOLUME_UP: code = "KEYCODE_VOLUME_UP";
-		          //case KeyEvent.VK_VOLUME_DOWN: code = "KEYCODE_VOLUME_DOWN";
-		          //case KeyEvent.VK_POWER: code = "KEYCODE_POWER";
-		          //case KeyEvent.VK_CAMERA: code = "KEYCODE_CAMERA";
-		          //case KeyEvent.VK_CLEAR: code = "KEYCODE_CLEAR";
-		          case KeyEvent.VK_A: code = "KEYCODE_A"; break;
-		          case KeyEvent.VK_B: code = "KEYCODE_B"; break;
-		          case KeyEvent.VK_C: code = "KEYCODE_C"; break;
-		          case KeyEvent.VK_D: code = "KEYCODE_D"; break;
-		          case KeyEvent.VK_E: code = "KEYCODE_E"; break;
-		          case KeyEvent.VK_F: code = "KEYCODE_F"; break;
-		          case KeyEvent.VK_G: code = "KEYCODE_G"; break;
-		          case KeyEvent.VK_H: code = "KEYCODE_H"; break;
-		          case KeyEvent.VK_I: code = "KEYCODE_I"; break;
-		          case KeyEvent.VK_J: code = "KEYCODE_J"; break;
-		          case KeyEvent.VK_K: code = "KEYCODE_K"; break;
-		          case KeyEvent.VK_L: code = "KEYCODE_L"; break;
-		          case KeyEvent.VK_M: code = "KEYCODE_M"; break;
-		          case KeyEvent.VK_N: code = "KEYCODE_N"; break;
-		          case KeyEvent.VK_O: code = "KEYCODE_O"; break;
-		          case KeyEvent.VK_P: code = "KEYCODE_P"; break;
-		          case KeyEvent.VK_Q: code = "KEYCODE_Q"; break;
-		          case KeyEvent.VK_R: code = "KEYCODE_R"; break;
-		          case KeyEvent.VK_S: code = "KEYCODE_S"; break;
-		          case KeyEvent.VK_T: code = "KEYCODE_T"; break;
-		          case KeyEvent.VK_U: code = "KEYCODE_U"; break;
-		          case KeyEvent.VK_V: code = "KEYCODE_V"; break;
-		          case KeyEvent.VK_W: code = "KEYCODE_W"; break;
-		          case KeyEvent.VK_X: code = "KEYCODE_X"; break;
-		          case KeyEvent.VK_Y: code = "KEYCODE_Y"; break;
-		          case KeyEvent.VK_Z: code = "KEYCODE_Z"; break;
-		          case KeyEvent.VK_COMMA: code = "KEYCODE_COMMA"; break;
-		          case KeyEvent.VK_PERIOD: code = "KEYCODE_PERIOD"; break;
-		          case KeyEvent.VK_ALT: code = "KEYCODE_ALT_LEFT"; break;
-		          //case KeyEvent.VK_ALT_RIGHT: code = "KEYCODE_ALT_RIGHT";
-		          case KeyEvent.VK_SHIFT: code = "KEYCODE_SHIFT_LEFT"; break;
-		          //case KeyEvent.VK_SHIFT_RIGHT: code = "KEYCODE_SHIFT_RIGHT";
-		          case KeyEvent.VK_TAB: code = "KEYCODE_TAB"; break;
-		          case KeyEvent.VK_SPACE: code = "KEYCODE_SPACE"; break;
-		          //case KeyEvent.VK_SYM: code = "KEYCODE_SYM";
-		          //case KeyEvent.VK_EXPLORER: code = "KEYCODE_EXPLORER";
-		          //case KeyEvent.VK_ENVELOPE: code = "KEYCODE_ENVELOPE";
-		          case KeyEvent.VK_ENTER: code = "KEYCODE_ENTER"; break;
-		          case KeyEvent.VK_DELETE: code = "KEYCODE_DEL"; break;
-		          case KeyEvent.VK_BACK_SPACE: code = "KEYCODE_DEL"; break;
-		          case KeyEvent.VK_DEAD_GRAVE: code = "KEYCODE_GRAVE"; break;
-		          case KeyEvent.VK_MINUS: code = "KEYCODE_MINUS"; break;
-		          case KeyEvent.VK_EQUALS: code = "KEYCODE_EQUALS"; break;
-		          case KeyEvent.VK_OPEN_BRACKET: code = "KEYCODE_LEFT_BRACKET"; break;
-		          case KeyEvent.VK_CLOSE_BRACKET: code = "KEYCODE_RIGHT_BRACKET"; break;
-		          case KeyEvent.VK_BACK_SLASH: code = "KEYCODE_BACKSLASH"; break;
-		          case KeyEvent.VK_SEMICOLON: code = "KEYCODE_SEMICOLON"; break;
-		          //case KeyEvent.VK_APOSTROPHE: code = "KEYCODE_APOSTROPHE";
-		          case KeyEvent.VK_SLASH: code = "KEYCODE_SLASH"; break;
-		          case KeyEvent.VK_AT: code = "KEYCODE_AT"; break;
-		          //case KeyEvent.VK_NUM: code = "KEYCODE_NUM";
-		          //case KeyEvent.VK_HEADSETHOOK: code = "KEYCODE_HEADSETHOOK";
-		          case KeyEvent.VK_PLUS: code = "KEYCODE_PLUS"; break;
-		          //case KeyEvent.VK_MENU: code = "KEYCODE_MENU";
-		          //case KeyEvent.VK_NOTIFICATION: code = "KEYCODE_NOTIFICATION";
-		          //case KeyEvent.VK_SEARCH: code = "KEYCODE_SEARCH";
-		          //case KeyEvent.VK_MEDIA_PLAY_PAUSE: code = "KEYCODE_MEDIA_PLAY_PAUSE";
-		          //case KeyEvent.VK_MEDIA_STOP: code = "KEYCODE_MEDIA_STOP";
-		          //case KeyEvent.VK_MEDIA_NEXT: code = "KEYCODE_MEDIA_NEXT";
-		          //case KeyEvent.VK_MEDIA_PREVIOUS: code = "KEYCODE_MEDIA_PREVIOUS";
-		          //case KeyEvent.VK_MEDIA_REWIND: code = "KEYCODE_MEDIA_REWIND";
-		          //case KeyEvent.VK_MEDIA_FAST_FORWARD: code = "KEYCODE_MEDIA_FAST_FORWARD";
-		          //case KeyEvent.VK_MUTE: code = "KEYCODE_MUTE";
-		          case KeyEvent.VK_PAGE_UP: code = "KEYCODE_PAGE_UP"; break;
-		          case KeyEvent.VK_PAGE_DOWN: code = "KEYCODE_PAGE_DOWN"; break;
-//		          case KeyEvent.VK_BUTTON_A: code = "KEYCODE_BUTTON_A";
-//		          case KeyEvent.VK_BUTTON_B: code = "KEYCODE_BUTTON_B";
-//		          case KeyEvent.VK_BUTTON_C: code = "KEYCODE_BUTTON_C";
-//		          case KeyEvent.VK_BUTTON_X: code = "KEYCODE_BUTTON_X";
-//		          case KeyEvent.VK_BUTTON_Y: code = "KEYCODE_BUTTON_Y";
-//		          case KeyEvent.VK_BUTTON_Z: code = "KEYCODE_BUTTON_Z";
-//		          case KeyEvent.VK_BUTTON_L1: code = "KEYCODE_BUTTON_L1";
-//		          case KeyEvent.VK_BUTTON_R1: code = "KEYCODE_BUTTON_R1";
-//		          case KeyEvent.VK_BUTTON_L2: code = "KEYCODE_BUTTON_L2";
-//		          case KeyEvent.VK_BUTTON_R2: code = "KEYCODE_BUTTON_R2";
-//		          case KeyEvent.VK_BUTTON_THUMBL: code = "KEYCODE_BUTTON_THUMBL";
-//		          case KeyEvent.VK_BUTTON_THUMBR: code = "KEYCODE_BUTTON_THUMBR";
-//		          case KeyEvent.VK_BUTTON_START: code = "KEYCODE_BUTTON_START";
-//		          case KeyEvent.VK_BUTTON_SELECT: code = "KEYCODE_BUTTON_SELECT";
-//		          case KeyEvent.VK_BUTTON_MODE: code = "KEYCODE_BUTTON_MODE";
-		      }
-		      lblOutput.setText("> [" + Integer.toString(keyCode) + ":" + Integer.toString(modifiers) + "]" + code);
 		      mDevice.press(code, TouchPressType.DOWN_AND_UP);//down?MonkeyDevice.DOWN : MonkeyDevice.UP);
-		 
 		} 
 	}
 	
@@ -344,19 +258,22 @@ public class MonkeyBoard {
 	 */
 	private void initialize() {
 		frmMonkeyboard = new JFrame();
+		frmMonkeyboard.setMinimumSize(new Dimension(512, 360));
 		frmMonkeyboard.setTitle("MonkeyBoard");
-		frmMonkeyboard.setResizable(false);
-		frmMonkeyboard.setBounds(100, 100, 438, 443);
+		frmMonkeyboard.setBounds(100, 100, 512, 360);
 		frmMonkeyboard.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		
 		// moved JList declaration to class-level declarartions
 		listView = new JList(listModel);
+		listView.setAlignmentY(Component.TOP_ALIGNMENT);
+		listView.setAlignmentX(Component.LEFT_ALIGNMENT);
 		listView.setBorder(new BevelBorder(BevelBorder.LOWERED, null, null, null, null));
 		listView.setCellRenderer(new DeviceListRenderer());
 		JButton btnRefresh = new JButton("Refresh");
 		btnRefresh.addMouseListener(new MouseAdapter() {
 			@Override
 			public void mouseClicked(MouseEvent arg0) {
+				toConsole("refreshing device list...");
 				refreshDeviceList();
 			}
 		});
@@ -379,6 +296,18 @@ public class MonkeyBoard {
 		});
 		
 		btnMonkeyBoard = new JButton("");
+		btnMonkeyBoard.addMouseListener(new MouseAdapter() {
+			@Override
+			public void mousePressed(MouseEvent arg0) {
+				// if the button has focus, then clicking it will give focus to something else, like a toggle switch.
+				if ( btnMonkeyBoard.hasFocus() ) {
+					textConsole.requestFocus();
+				}
+			}
+		});
+		btnMonkeyBoard.setHorizontalTextPosition(SwingConstants.CENTER);
+		btnMonkeyBoard.setFocusTraversalKeysEnabled(false);
+		btnMonkeyBoard.setAlignmentX(Component.CENTER_ALIGNMENT);
 		btnMonkeyBoard.setBorderPainted(false);
 		btnMonkeyBoard.setIconTextGap(0);
 		btnMonkeyBoard.setPressedIcon(new ImageIcon(MonkeyBoard.class.getResource("/res/android_large_sel.png")));
@@ -415,11 +344,7 @@ public class MonkeyBoard {
 		btnMonkeyBoard.setBorder(null);
 		btnMonkeyBoard.setIcon(new ImageIcon(MonkeyBoard.class.getResource("/res/android_large.png")));
 		
-		JTextPane textConsole = new JTextPane();
-		textConsole.setText(">>>");
-		textConsole.setForeground(Color.GREEN);
-		textConsole.setBackground(Color.BLACK);
-		textConsole.setBorder(new BevelBorder(BevelBorder.LOWERED, null, null, null, null));
+		JScrollPane scrollPane = new JScrollPane();
 
 		GroupLayout groupLayout = new GroupLayout(frmMonkeyboard.getContentPane());
 		groupLayout.setHorizontalGroup(
@@ -427,34 +352,45 @@ public class MonkeyBoard {
 				.addGroup(groupLayout.createSequentialGroup()
 					.addContainerGap()
 					.addGroup(groupLayout.createParallelGroup(Alignment.LEADING)
-						.addComponent(textConsole)
 						.addGroup(groupLayout.createSequentialGroup()
-							.addGroup(groupLayout.createParallelGroup(Alignment.LEADING, false)
+							.addComponent(scrollPane, GroupLayout.DEFAULT_SIZE, 438, Short.MAX_VALUE)
+							.addContainerGap())
+						.addGroup(groupLayout.createSequentialGroup()
+							.addGroup(groupLayout.createParallelGroup(Alignment.LEADING)
 								.addGroup(groupLayout.createSequentialGroup()
 									.addComponent(btnRefresh)
 									.addPreferredGap(ComponentPlacement.RELATED)
-									.addComponent(btnConnect))
-								.addComponent(listView, GroupLayout.DEFAULT_SIZE, GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
-							.addPreferredGap(ComponentPlacement.UNRELATED)
-							.addComponent(btnMonkeyBoard, GroupLayout.PREFERRED_SIZE, 219, GroupLayout.PREFERRED_SIZE)))
-					.addContainerGap())
+									.addComponent(btnConnect)
+									.addGap(0, 0, Short.MAX_VALUE))
+								.addComponent(listView, GroupLayout.DEFAULT_SIZE, 193, Short.MAX_VALUE))
+							.addGap(3)
+							.addComponent(btnMonkeyBoard, GroupLayout.PREFERRED_SIZE, 246, Short.MAX_VALUE)
+							.addGap(2))))
 		);
 		groupLayout.setVerticalGroup(
 			groupLayout.createParallelGroup(Alignment.LEADING)
 				.addGroup(groupLayout.createSequentialGroup()
 					.addContainerGap()
-					.addGroup(groupLayout.createParallelGroup(Alignment.TRAILING)
+					.addGroup(groupLayout.createParallelGroup(Alignment.TRAILING, false)
 						.addGroup(groupLayout.createSequentialGroup()
-							.addComponent(listView, GroupLayout.PREFERRED_SIZE, 234, GroupLayout.PREFERRED_SIZE)
-							.addPreferredGap(ComponentPlacement.RELATED, GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+							.addComponent(listView, GroupLayout.PREFERRED_SIZE, 244, GroupLayout.PREFERRED_SIZE)
+							.addPreferredGap(ComponentPlacement.RELATED)
 							.addGroup(groupLayout.createParallelGroup(Alignment.BASELINE)
-								.addComponent(btnRefresh)
-								.addComponent(btnConnect)))
-						.addComponent(btnMonkeyBoard))
+								.addComponent(btnConnect)
+								.addComponent(btnRefresh)))
+						.addComponent(btnMonkeyBoard, GroupLayout.PREFERRED_SIZE, 279, GroupLayout.PREFERRED_SIZE))
 					.addPreferredGap(ComponentPlacement.RELATED)
-					.addComponent(textConsole, GroupLayout.PREFERRED_SIZE, 113, GroupLayout.PREFERRED_SIZE)
+					.addComponent(scrollPane, GroupLayout.DEFAULT_SIZE, 92, Short.MAX_VALUE)
 					.addContainerGap())
 		);
+		
+		textConsole = new JTextPane();
+		textConsole.setText("ready");
+		textConsole.setForeground(Color.GREEN);
+		textConsole.setFont(new Font("Monospaced", Font.PLAIN, 15));
+		textConsole.setEditable(false);
+		textConsole.setBackground(Color.BLACK);
+		scrollPane.setViewportView(textConsole);
 		frmMonkeyboard.getContentPane().setLayout(groupLayout);
 		
 		JMenuBar menuBar = new JMenuBar();
@@ -464,28 +400,96 @@ public class MonkeyBoard {
 		JMenu mnActions = new JMenu("Actions");
 		menuBar.add(mnActions);
 		
-		JMenuItem mntmRefreshDeviceList = new JMenuItem("Refresh Device List");
-		mnActions.add(mntmRefreshDeviceList);
+		JMenuItem mntmRestartAdbServer = new JMenuItem("Restart adb server");
+		mntmRestartAdbServer.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_R, InputEvent.META_MASK));
+		mnActions.add(mntmRestartAdbServer);		
 		
+		JMenuItem mntmRefreshDeviceList = new JMenuItem("Refresh Device List");
+		mntmRefreshDeviceList.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_L, InputEvent.META_MASK));
+		mntmRefreshDeviceList.setMnemonic('r');
+		mntmRefreshDeviceList.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent arg0) {
+			toConsole("refreshing device list...");
+			refreshDeviceList();
+			}
+		});
+		mnActions.add(mntmRefreshDeviceList);
+				
 		JMenuItem mntmConnectToDevice = new JMenuItem("Connect To Device");
+		mntmConnectToDevice.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_N, InputEvent.META_MASK));
 		mnActions.add(mntmConnectToDevice);
 		
+		mnActions.add(new JSeparator());
+		
 		JMenuItem mntmInstallapk = new JMenuItem("Install *.apk...");
+		mntmInstallapk.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_I, InputEvent.META_MASK));
 		mnActions.add(mntmInstallapk);
 		
 		JMenuItem mntmUninstallPackage = new JMenuItem("Uninstall Package...");
+		mntmUninstallPackage.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_U, InputEvent.META_MASK));
 		mnActions.add(mntmUninstallPackage);
 		
 		JMenuItem mntmExecuteShellCommand = new JMenuItem("Execute Shell Command...");
+		mntmExecuteShellCommand.setMnemonic('x');
+		mntmExecuteShellCommand.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_X, Event.META_MASK));
 		mnActions.add(mntmExecuteShellCommand);
+
+		mnActions.add(new JSeparator());
 		
 		JMenuItem mntmSaveScreenshot = new JMenuItem("Save Screenshot");
+		mntmSaveScreenshot.setMnemonic('s');
+		mntmSaveScreenshot.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_S, Event.META_MASK));
 		mnActions.add(mntmSaveScreenshot);
 		
 		JMenuItem mntmSaveScreenshotAs = new JMenuItem("Save Screenshot As...");
+		mntmSaveScreenshotAs.setMnemonic('a');
+		mntmSaveScreenshotAs.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_A, Event.META_MASK));
 		mnActions.add(mntmSaveScreenshotAs);
 		
-		JMenuItem mntmExit = new JMenuItem("Exit");
-		mnActions.add(mntmExit);
+		JMenuItem mntmDisplayScreenshot = new JMenuItem("Display Screenshot...");
+		mntmDisplayScreenshot.setMnemonic('d');
+		mntmDisplayScreenshot.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_D, Event.META_MASK));
+		mnActions.add(mntmDisplayScreenshot);
+		
+		mnActions.add(new JSeparator());
+		
+		JMenuItem mntmQuit = new JMenuItem("Quit");
+		mntmQuit.setMnemonic('q');
+		mntmQuit.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_Q, Event.META_MASK)); 
+		mnActions.add(mntmQuit);
+		
+		JMenu mnKeys = new JMenu("Keys");
+		menuBar.add(mnKeys);
+		
+		JMenuItem mntmHome = new JMenuItem("Home");
+		mntmHome.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_H, InputEvent.META_MASK));
+		mnKeys.add(mntmHome);
+		
+		JMenuItem mntmMenu = new JMenuItem("Menu");
+		mntmMenu.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_M, InputEvent.META_MASK));
+		mnKeys.add(mntmMenu);
+		
+		JMenuItem mntmSearch = new JMenuItem("Search");
+		mntmSearch.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_SLASH, InputEvent.META_MASK));
+		mnKeys.add(mntmSearch);
+		
+		JMenuItem mntmPower = new JMenuItem("Power");
+		mntmPower.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, InputEvent.META_MASK));
+		mnKeys.add(mntmPower);
+		
+		JMenuItem mntmCamera = new JMenuItem("Camera");
+		mntmCamera.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_C, InputEvent.META_MASK));
+		mnKeys.add(mntmCamera);
+		
+		JSeparator separator = new JSeparator();
+		mnKeys.add(separator);
+		
+		JMenuItem mntmVolumeUp = new JMenuItem("Volume Up");
+		mntmVolumeUp.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_EQUALS, InputEvent.META_MASK));
+		mnKeys.add(mntmVolumeUp);
+		
+		JMenuItem mntmVolumeDown = new JMenuItem("Volume Down");
+		mntmVolumeDown.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_MINUS, InputEvent.META_MASK));
+		mnKeys.add(mntmVolumeDown);
 	}
 }
