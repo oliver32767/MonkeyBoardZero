@@ -11,19 +11,12 @@ import javax.swing.GroupLayout.Alignment;
 import javax.swing.JSeparator;
 import javax.swing.KeyStroke;
 import javax.swing.LayoutStyle.ComponentPlacement;
-import javax.swing.JLabel;
 import javax.swing.ImageIcon;
-import javax.swing.Timer;
-import javax.swing.border.TitledBorder;
-import javax.swing.border.EtchedBorder;
 
 import com.android.chimpchat.ChimpChat;
 import com.android.chimpchat.core.IChimpDevice;
 import com.android.chimpchat.core.TouchPressType;
-import com.android.ddmlib.Log;
-import com.android.ddmlib.ShellCommandUnresponsiveException;
 
-import java.awt.Color;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.io.BufferedReader;
@@ -40,22 +33,16 @@ import java.awt.event.FocusAdapter;
 import java.awt.event.FocusEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.ActionEvent;
-import javax.swing.border.MatteBorder;
 import javax.swing.border.BevelBorder;
-import javax.swing.border.CompoundBorder;
 import javax.swing.text.Document;
 import javax.swing.text.SimpleAttributeSet;
 
 import java.awt.Cursor;
 import java.awt.Event;
-import java.awt.Frame;
 import java.awt.Rectangle;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
-import java.awt.Toolkit;
 import javax.swing.JMenuBar;
-import javax.swing.JTabbedPane;
-import javax.swing.JPanel;
 import javax.swing.JMenu;
 import javax.swing.JMenuItem;
 import javax.swing.JTextPane;
@@ -65,13 +52,15 @@ import javax.swing.SwingConstants;
 import java.awt.Font;
 import javax.swing.JScrollPane;
 import java.awt.event.InputEvent;
+import java.awt.SystemColor;
+import javax.swing.JCheckBoxMenuItem;
 
 public class MonkeyBoard {
 	private DefaultListModel listModel = new DefaultListModel();
 	private JList listView = null;
 	private JButton btnMonkeyBoard = null;
 	private JTextPane textConsole = null;
-	private JFrame frmMonkeyboard;
+	JFrame frmMonkeyboard;
 
     private ChimpChat mChimpChat;
     private IChimpDevice mDevice; 
@@ -84,8 +73,8 @@ public class MonkeyBoard {
     // lookup table to translate from Java keycodes to Android
     private Map<Integer, String> keyCodeMap = new TreeMap<Integer, String>();
     
-    // Set to track which keycodes are currently in a down state
-    private Set<Integer> keysPressed = new HashSet<Integer>();
+    // Set to track which android keycodes are currently in a down state
+    private Set<String> keysPressed = new HashSet<String>();
     
 	/**
 	 * Create the application.
@@ -178,7 +167,6 @@ public class MonkeyBoard {
 			String devStatus = dev.getValue().trim();
 			Map <String, String> elem = new HashMap<String, String>();
 
-
 			// build list element
 			if ( devId.equals(connectedDeviceId) ) {
 				devStatus = "connected";
@@ -240,38 +228,115 @@ public class MonkeyBoard {
 	 */
 	private void keyEventHandler(int keyCode, int modifiers, TouchPressType type) {
 		String code = null;
-		String stype = (type == TouchPressType.DOWN)?"DOWN":"UP";
+		String stype = (type == TouchPressType.DOWN)?"PRESS":"RELEASE";
+		//Boolean isShift = ((modifiers & 0x01) == 1);
+		Boolean isCtrl = ((modifiers & 0x02) == 2);
+		Boolean isMeta = ((modifiers & 0x04) == 4);
+		//Boolean isAlt = ((modifiers & 0x08) == 8);
 		
-		// don't stream multiple Back keyDowns, because only the first one matters 
-		if (( keyCode == KeyEvent.VK_ESCAPE ) && 
-				(keysPressed.contains(KeyEvent.VK_ESCAPE)) &&
+		
+		// ignore all meta + keydown (Such as Command + S)
+		if (isMeta && (type == TouchPressType.DOWN)) return;		
+		
+		// manually map some special ctrl+keyevents
+		// TODO: make this not so brittle. incorporate this into a keymap?
+		switch (keyCode) {
+			case KeyEvent.VK_ENTER:
+				// if the special mapping is already pressed, it's a keyup
+				// the reason we don't care about isCtrl is it's possible the user
+				// can release ctrl before the key in question, and then a release event will never be sent
+				if ((isCtrl && (type == TouchPressType.DOWN)) || 
+						(keysPressed.contains("KEYCODE_DPAD_CENTER")))
+					code = "KEYCODE_DPAD_CENTER"; 
+				break;
+			
+			// emulator parity
+			case KeyEvent.VK_F3:
+				if ((isCtrl && (type == TouchPressType.DOWN)) || 
+						(keysPressed.contains("KEYCODE_CAMERA")))
+					code = "KEYCODE_CAMERA"; 
+				break;
+				
+			case KeyEvent.VK_F5:
+				if ((isCtrl && (type == TouchPressType.DOWN)) || 
+						(keysPressed.contains("KEYCODE_VOLUME_UP")))
+					code = "KEYCODE_VOLUME_UP"; 
+				break;
+				
+			case KeyEvent.VK_F6:
+				if ((isCtrl && (type == TouchPressType.DOWN)) || 
+						(keysPressed.contains("KEYCODE_VOLUME_DOWN")))
+					code = "KEYCODE_VOLUME_DOWN"; 
+				break;
+			
+			// these ones make more sense than the emulator defaults
+			case KeyEvent.VK_M:
+				if ((isCtrl && (type == TouchPressType.DOWN)) || 
+						(keysPressed.contains("KEYCODE_MENU")))
+					code = "KEYCODE_MENU"; 
+				break;
+				
+			case KeyEvent.VK_S:
+				if ((isCtrl && (type == TouchPressType.DOWN)) || 
+						(keysPressed.contains("KEYCODE_SEARCH")))
+					code = "KEYCODE_SEARCH"; 
+				break;
+			
+			case KeyEvent.VK_H:
+				if ((isCtrl && (type == TouchPressType.DOWN)) || 
+						(keysPressed.contains("KEYCODE_HOME")))
+					code = "KEYCODE_HOME"; 
+				break;
+				
+			case KeyEvent.VK_P:
+				if ((isCtrl && (type == TouchPressType.DOWN)) || 
+						(keysPressed.contains("KEYCODE_POWER")))
+					code = "KEYCODE_POWER"; 
+				break;
+				
+			case KeyEvent.VK_C:
+				if ((isCtrl && (type == TouchPressType.DOWN)) || 
+						(keysPressed.contains("KEYCODE_CAMERA")))
+					code = "KEYCODE_CAMERA"; 
+				break;
+				
+			case KeyEvent.VK_MINUS:
+				if ((isCtrl && (type == TouchPressType.DOWN)) || 
+						(keysPressed.contains("KEYCODE_VOLUME_DOWN")))
+					code = "KEYCODE_VOLUME_DOWN"; 
+				break;
+				
+			case KeyEvent.VK_EQUALS:
+				if ((isCtrl && (type == TouchPressType.DOWN)) || 
+						(keysPressed.contains("KEYCODE_VOLUME_UP")))
+					code = "KEYCODE_VOLUME_UP"; 
+				break;
+		}
+		
+		// if code is still null, then do a regular lookup in the map
+		if ( code == null ) code = keyCodeMap.get(keyCode);
+		
+		// still null? nothing to do here
+		if ( code == null ) return;
+		
+		// if it's a keydown and there's already a reference in keysPressed, don't send another keydown 
+		if ((keysPressed.contains(code)) &&
 				(type == TouchPressType.DOWN))
 			return;
 		
-		// look up the Java keycode in the Map, exit early if a match can't be found
-		try {
-			code = keyCodeMap.get(keyCode);
-		} catch (Exception e) {
-			toConsole("[" + Integer.toString(keyCode) + ":" + Integer.toString(modifiers) + "] KEYCODE_UNKNOWN " + stype);
-			return;
-		}
-
+		// now we focus on sending it to the device, log it
 		toConsole("[" + Integer.toString(keyCode) + ":" + Integer.toString(modifiers) + "] " + code + " " + stype);
-
+		
 		// make sure the state of the key is properly stored
 		switch(type) {
-		case DOWN:keysPressed.add(keyCode); break;
-		case UP:keysPressed.remove(keyCode); break;
+		case DOWN:keysPressed.add(code); break;
+		case UP:keysPressed.remove(code); break;
 		}
-
-		// DOWN_AND_UP is a special case reserved for use by resetKeysPressed()
-		if (type == TouchPressType.DOWN_AND_UP) type = TouchPressType.UP;
 		
 		// actually send the key event if we're connected to a device
-		if ((this.connectedDeviceId != null) && (type != TouchPressType.DOWN_AND_UP)) {
+		if (this.connectedDeviceId != null)  {
 			mDevice.press(code, type);
 		}
-
 	}
 
 	/**
@@ -280,33 +345,17 @@ public class MonkeyBoard {
 	 * a matching up command in the event of lost focus
 	 */
 	private void resetKeysPressed() {
-		Iterator<Integer> iter = keysPressed.iterator();
-		int code;
+		Iterator<String> iter = keysPressed.iterator();
+		String code;
 	    while (iter.hasNext()) {
+	    	code = iter.next();
+	    	toConsole("[-:-] " + code + " RELEASE");
 			if (this.connectedDeviceId != null) {
-				code = iter.next();
-				keyEventHandler(code, 0, TouchPressType.DOWN_AND_UP);
+				mDevice.press(code, TouchPressType.UP);
 			} 
 	    }
+	    keysPressed.clear();
 	}
-	
-	/**
-	 * Launch the application.
-	 */
-	public static void main(String[] args) {
-		EventQueue.invokeLater(new Runnable() {
-			public void run() {
-				try {
-					MonkeyBoard window = new MonkeyBoard();
-					window.frmMonkeyboard.setVisible(true);
-				} catch (Exception e) {
-					e.printStackTrace();
-				}
-			}
-		});
-	}
-
-
 
 	/**
 	 * Initialize the contents of the frame.
@@ -435,10 +484,10 @@ public class MonkeyBoard {
 		
 		textConsole = new JTextPane();
 		textConsole.setText("ready");
-		textConsole.setForeground(Color.GREEN);
+		textConsole.setForeground(SystemColor.windowText);
 		textConsole.setFont(new Font("Monospaced", Font.PLAIN, 15));
 		textConsole.setEditable(false);
-		textConsole.setBackground(Color.BLACK);
+		textConsole.setBackground(SystemColor.window);
 		scrollPane.setViewportView(textConsole);
 		frmMonkeyboard.getContentPane().setLayout(groupLayout);
 		
@@ -446,12 +495,12 @@ public class MonkeyBoard {
 		menuBar.setBorder(null);
 		frmMonkeyboard.setJMenuBar(menuBar);
 		
-		JMenu mnActions = new JMenu("Actions");
-		menuBar.add(mnActions);
+		JMenu mnFile = new JMenu("File");
+		menuBar.add(mnFile);
 		
 		JMenuItem mntmRestartAdbServer = new JMenuItem("Restart adb server");
 		mntmRestartAdbServer.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_R, InputEvent.META_MASK));
-		mnActions.add(mntmRestartAdbServer);		
+		mnFile.add(mntmRestartAdbServer);		
 		
 		JMenuItem mntmRefreshDeviceList = new JMenuItem("Refresh Device List");
 		mntmRefreshDeviceList.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_L, InputEvent.META_MASK));
@@ -462,90 +511,59 @@ public class MonkeyBoard {
 			refreshDeviceList();
 			}
 		});
-		mnActions.add(mntmRefreshDeviceList);
+		mnFile.add(mntmRefreshDeviceList);
 				
 		JMenuItem mntmConnectToDevice = new JMenuItem("Connect To Device");
 		mntmConnectToDevice.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_N, InputEvent.META_MASK));
-		mnActions.add(mntmConnectToDevice);
+		mnFile.add(mntmConnectToDevice);
 		
-		mnActions.add(new JSeparator());
+		mnFile.add(new JSeparator());
 		
 		JMenuItem mntmInstallapk = new JMenuItem("Install *.apk...");
+		mntmInstallapk.setEnabled(false);
 		mntmInstallapk.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_I, InputEvent.META_MASK));
-		mnActions.add(mntmInstallapk);
+		mnFile.add(mntmInstallapk);
 		
 		JMenuItem mntmUninstallPackage = new JMenuItem("Uninstall Package...");
+		mntmUninstallPackage.setEnabled(false);
 		mntmUninstallPackage.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_U, InputEvent.META_MASK));
-		mnActions.add(mntmUninstallPackage);
+		mnFile.add(mntmUninstallPackage);
 		
 		JMenuItem mntmExecuteShellCommand = new JMenuItem("Execute Shell Command...");
+		mntmExecuteShellCommand.setEnabled(false);
 		mntmExecuteShellCommand.setMnemonic('x');
 		mntmExecuteShellCommand.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_X, Event.META_MASK));
-		mnActions.add(mntmExecuteShellCommand);
+		mnFile.add(mntmExecuteShellCommand);
+		
+		JMenuItem mntmGetDeviceProperties = new JMenuItem("Get Device Properties");
+		mntmGetDeviceProperties.setEnabled(false);
+		mntmGetDeviceProperties.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_P, InputEvent.META_MASK));
+		mnFile.add(mntmGetDeviceProperties);
 
-		mnActions.add(new JSeparator());
+		mnFile.add(new JSeparator());
 		
 		JMenuItem mntmSaveScreenshot = new JMenuItem("Save Screenshot");
+		mntmSaveScreenshot.setEnabled(false);
 		mntmSaveScreenshot.setMnemonic('s');
 		mntmSaveScreenshot.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_S, Event.META_MASK));
-		mnActions.add(mntmSaveScreenshot);
+		mnFile.add(mntmSaveScreenshot);
 		
 		JMenuItem mntmSaveScreenshotAs = new JMenuItem("Save Screenshot As...");
+		mntmSaveScreenshotAs.setEnabled(false);
 		mntmSaveScreenshotAs.setMnemonic('a');
 		mntmSaveScreenshotAs.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_A, Event.META_MASK));
-		mnActions.add(mntmSaveScreenshotAs);
+		mnFile.add(mntmSaveScreenshotAs);
 		
 		JMenuItem mntmDisplayScreenshot = new JMenuItem("Display Screenshot...");
-		mntmDisplayScreenshot.setMnemonic('d');
-		mntmDisplayScreenshot.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_D, Event.META_MASK));
-		mnActions.add(mntmDisplayScreenshot);
-		
-		mnActions.add(new JSeparator());
-		
-		JMenuItem mntmQuit = new JMenuItem("Quit");
-		mntmQuit.setMnemonic('q');
-		mntmQuit.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_Q, Event.META_MASK)); 
-		mnActions.add(mntmQuit);
-		
-		JMenu mnKeys = new JMenu("Keys");
-		menuBar.add(mnKeys);
-		
-		JMenuItem mntmHome = new JMenuItem("Home");
-		mntmHome.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_H, InputEvent.META_MASK));
-		mnKeys.add(mntmHome);
-		
-		JMenuItem mntmMenu = new JMenuItem("Menu");
-		mntmMenu.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_M, InputEvent.META_MASK));
-		mnKeys.add(mntmMenu);
-		
-		JMenuItem mntmSearch = new JMenuItem("Search");
-		mntmSearch.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_SLASH, InputEvent.META_MASK));
-		mnKeys.add(mntmSearch);
-		
-		JMenuItem mntmPower = new JMenuItem("Power");
-		mntmPower.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, InputEvent.META_MASK));
-		mnKeys.add(mntmPower);
-		
-		JMenuItem mntmCamera = new JMenuItem("Camera");
-		mntmCamera.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_C, InputEvent.META_MASK));
-		mnKeys.add(mntmCamera);
-		
-		JSeparator separator = new JSeparator();
-		mnKeys.add(separator);
-		
-		JMenuItem mntmVolumeUp = new JMenuItem("Volume Up");
-		mntmVolumeUp.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_EQUALS, InputEvent.META_MASK));
-		mnKeys.add(mntmVolumeUp);
-		
-		JMenuItem mntmVolumeDown = new JMenuItem("Volume Down");
-		mntmVolumeDown.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_MINUS, InputEvent.META_MASK));
-		mnKeys.add(mntmVolumeDown);
+		mntmDisplayScreenshot.setEnabled(false);
+		mntmDisplayScreenshot.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_D, InputEvent.META_MASK));
+		mnFile.add(mntmDisplayScreenshot);
 	}
 	
 	public void initializeKeyCodeMap() {
 		// modifiers
 		keyCodeMap.put(KeyEvent.VK_SHIFT, "KEYCODE_SHIFT_LEFT");
-		keyCodeMap.put(KeyEvent.VK_CONTROL, "KEYCODE_CTRL_LEFT");					
+		//keyCodeMap.put(KeyEvent.VK_CONTROL, "KEYCODE_CTRL_LEFT");					
 		keyCodeMap.put(KeyEvent.VK_ALT, "KEYCODE_ALT_LEFT");
 	
 		// alphanumeric
@@ -591,21 +609,21 @@ public class MonkeyBoard {
 		keyCodeMap.put(KeyEvent.VK_DOWN, "KEYCODE_DPAD_DOWN");
 		keyCodeMap.put(KeyEvent.VK_LEFT, "KEYCODE_DPAD_LEFT");
 		keyCodeMap.put(KeyEvent.VK_RIGHT, "KEYCODE_DPAD_RIGHT");
-		//keyCodeMap.put(KeyEvent.VK_ENTER, "KEYCODE_DPAD_CENTER";
 		
-		//keyCodeMap.put(KeyEvent.VK_SOFT_LEFT, "KEYCODE_SOFT_LEFT";
-		//keyCodeMap.put(KeyEvent.VK_SOFT_RIGHT, "KEYCODE_SOFT_RIGHT";
 		keyCodeMap.put(KeyEvent.VK_HOME, "KEYCODE_HOME");
+		keyCodeMap.put(KeyEvent.VK_END, "KEYCODE_END");
+		keyCodeMap.put(KeyEvent.VK_PAGE_UP, "KEYCODE_PAGE_UP");
+		keyCodeMap.put(KeyEvent.VK_PAGE_DOWN, "KEYCODE_PAGE_DOWN");
 		keyCodeMap.put(KeyEvent.VK_ESCAPE, "KEYCODE_BACK");
-		//keyCodeMap.put(KeyEvent.VK_CALL, "KEYCODE_CALL";
-		//keyCodeMap.put(KeyEvent.VK_ENDCALL, "KEYCODE_ENDCALL";
-		//keyCodeMap.put(KeyEvent.VK_STAR, "KEYCODE_STAR";
-		//keyCodeMap.put(KeyEvent.VK_POUND, "KEYCODE_POUND";
-		//keyCodeMap.put(KeyEvent.VK_VOLUME_UP, "KEYCODE_VOLUME_UP";
-		//keyCodeMap.put(KeyEvent.VK_VOLUME_DOWN, "KEYCODE_VOLUME_DOWN";
-		//keyCodeMap.put(KeyEvent.VK_POWER, "KEYCODE_POWER";
-		//keyCodeMap.put(KeyEvent.VK_CAMERA, "KEYCODE_CAMERA";
-		//keyCodeMap.put(KeyEvent.VK_CLEAR, "KEYCODE_CLEAR";
+		
+		// parity with android emulator
+		keyCodeMap.put(KeyEvent.VK_F3, "KEYCODE_CALL");
+		keyCodeMap.put(KeyEvent.VK_F4, "KEYCODE_ENDCALL");
+		keyCodeMap.put(KeyEvent.VK_F5, "KEYCODE_SEARCH");
+		keyCodeMap.put(KeyEvent.VK_F7, "KEYCODE_POWER");		
+		
+		// errata
+		keyCodeMap.put(KeyEvent.VK_CLEAR, "KEYCODE_CLEAR");
 		keyCodeMap.put(KeyEvent.VK_COMMA, "KEYCODE_COMMA");
 		keyCodeMap.put(KeyEvent.VK_PERIOD, "KEYCODE_PERIOD");
 		keyCodeMap.put(KeyEvent.VK_TAB, "KEYCODE_TAB");
@@ -613,7 +631,7 @@ public class MonkeyBoard {
 		keyCodeMap.put(KeyEvent.VK_ENTER, "KEYCODE_ENTER");
 		keyCodeMap.put(KeyEvent.VK_DELETE, "KEYCODE_DEL");
 		keyCodeMap.put(KeyEvent.VK_BACK_SPACE, "KEYCODE_DEL");
-		keyCodeMap.put(KeyEvent.VK_DEAD_GRAVE, "KEYCODE_GRAVE");
+		keyCodeMap.put(KeyEvent.VK_BACK_QUOTE, "KEYCODE_GRAVE");
 		keyCodeMap.put(KeyEvent.VK_MINUS, "KEYCODE_MINUS");
 		keyCodeMap.put(KeyEvent.VK_EQUALS, "KEYCODE_EQUALS");
 		keyCodeMap.put(KeyEvent.VK_OPEN_BRACKET, "KEYCODE_LEFT_BRACKET");
@@ -623,7 +641,6 @@ public class MonkeyBoard {
 		keyCodeMap.put(KeyEvent.VK_SLASH, "KEYCODE_SLASH");
 		keyCodeMap.put(KeyEvent.VK_AT, "KEYCODE_AT");
 		keyCodeMap.put(KeyEvent.VK_PLUS, "KEYCODE_PLUS");
-		keyCodeMap.put(KeyEvent.VK_PAGE_UP, "KEYCODE_PAGE_UP");
-		keyCodeMap.put(KeyEvent.VK_PAGE_DOWN, "KEYCODE_PAGE_DOWN");
+
 	}
 }
