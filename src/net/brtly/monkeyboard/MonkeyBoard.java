@@ -30,9 +30,11 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.TreeMap;
 import java.awt.event.FocusAdapter;
 import java.awt.event.FocusEvent;
@@ -47,6 +49,7 @@ import javax.swing.text.SimpleAttributeSet;
 import java.awt.Cursor;
 import java.awt.Event;
 import java.awt.Frame;
+import java.awt.Rectangle;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.awt.Toolkit;
@@ -69,52 +72,56 @@ public class MonkeyBoard {
 	private JButton btnMonkeyBoard = null;
 	private JTextPane textConsole = null;
 	private JFrame frmMonkeyboard;
-	
-    private static final String ANDROID_SDK = "/Users/obartley/Library/android-sdk-macosx-r15/";
-    private static final String ADB = ANDROID_SDK + "platform-tools/adb";
-    
-    private static final long TIMEOUT = 5000;
-    private static final int REFRESH_INTERVAL = 3000;
-    
+
     private ChimpChat mChimpChat;
     private IChimpDevice mDevice; 
     private String connectedDeviceId = null;
     
-	private int keyPressStatus; //increased everytime there's a keyPress event, -- on keyReleased	
+    private static final String ANDROID_SDK = "/Users/obartley/Library/android-sdk-macosx-r15/";
+    private static final String ADB = ANDROID_SDK + "platform-tools/adb";
+    private static final long TIMEOUT = 5000;
 	
+    // lookup table to translate from Java keycodes to Android
+    private Map<Integer, String> keyCodeMap = new TreeMap<Integer, String>();
+    
+    // Set to track which keycodes are currently in a down state
+    private Set<Integer> keysPressed = new HashSet<Integer>();
+    
 	/**
 	 * Create the application.
 	 */
 	public MonkeyBoard() {
 		initialize();
-
-//		// set up the timer to refresh the device list
-//		ActionListener timerTick = new ActionListener() {
-//		      public void actionPerformed(ActionEvent e) {
-//		          refreshDeviceList();
-//		      }
-//		};
-//		new Timer(REFRESH_INTERVAL, timerTick).start();
+		initializeKeyCodeMap();
 		refreshDeviceList();
 		TreeMap<String, String> options = new TreeMap<String, String>();
         options.put("backend", "adb");
         options.put("adbLocation", ADB);
 		mChimpChat = ChimpChat.getInstance(options);
-		
-		
 	}
 	
+	/**
+	 *  Append a String to the text in the console and force scrolling to the end of the doc
+	 */
 	public void toConsole(String arg0) {
 		try {
+			// get document from console and append arg0
 			Document d = textConsole.getDocument();
 			SimpleAttributeSet attributes = new SimpleAttributeSet();
 			d.insertString(d.getLength(), '\n' + arg0, attributes);
+			// force scrolling to end of output
+			textConsole.scrollRectToVisible(new Rectangle(0, textConsole.getHeight()-2, 1, 1));
 		} catch (Exception e) {
 			System.err.println("Error instering:" + arg0);
 			e.printStackTrace();
 		}
 	}
 	
+	/**
+	 * Capture output from `adb devices`, parses it and returns data in a Map in the form of
+	 * deviceId:key::status:value
+	 * @return
+	 */
 	private Map<String, String> getAdbStatus() {
 		Map<String, String> rv = new HashMap<String, String>();
 		// Capture output from `adb devices` and map connected deviceIds to their status
@@ -142,10 +149,8 @@ public class MonkeyBoard {
 		String line = "";
 		try {
 			while ((line=buf.readLine())!=null) {
-				
 				if ( ! (line.startsWith("List") || line.length() <= 1) ) {
 					String[] s = line.split("\\s+"); //it's a tab separated list, dude!
-					//System.out.println(line + ":" + Integer.toString(s.length));
 					rv.put(s[0], s[1]); // add deviceId, status to Map
 				}
 			}
@@ -155,12 +160,16 @@ public class MonkeyBoard {
 		return rv;
 	}	
 	
+	/**
+	 * refreshes data in listModel to reflect the current status of devices connected to adb
+	 */
 	private void refreshDeviceList() {
 		Map<String, String> adb = getAdbStatus();
 		Iterator<Entry<String, String>> adbDevices = adb.entrySet().iterator();
 		Boolean foundConnectedDevice = false;
 		
 		// iterate over the items in adb
+		// TODO: make listModel items persist and update the list on an interval
 		listModel.clear();
 		while (adbDevices.hasNext()) {
 			Entry<String, String> dev =  (Entry<String, String>) adbDevices.next();
@@ -207,33 +216,79 @@ public class MonkeyBoard {
 	private void connectToDevice(String deviceId) {
 		//TODO: maybe make this threaded, so an unresponsive emulator/device
 		// doesn't block the main thread
-		toConsole("Connecting to: " + deviceId);
 		try {
 	        mDevice = mChimpChat.waitForConnection(TIMEOUT, deviceId);
-	        if ( mDevice == null ) {
-	                throw new RuntimeException("Couldn't connect.");
-	        }
+	        if ( mDevice == null ) throw new RuntimeException("Couldn't connect.");
 	        mDevice.wake();
-
 	        this.connectedDeviceId = deviceId;
+	        toConsole("connected to device: " + deviceId);
 		} catch (Exception e) {
 			e.printStackTrace();
 			mDevice = null;
 			connectedDeviceId = null;
+        	toConsole("couldn't connect to device: " + deviceId);    
 		}
         this.refreshDeviceList();
 	}
 	
-	private void sendKeyToDevice(int keyCode, int modifiers) {
-		String code = KeyCodeTable.lookup(keyCode, modifiers);
-		      
-		toConsole("[" + Integer.toString(keyCode) + ":" + Integer.toString(modifiers) + "]" + code);
-		if (this.connectedDeviceId != null) {
-		      mDevice.press(code, TouchPressType.DOWN_AND_UP);//down?MonkeyDevice.DOWN : MonkeyDevice.UP);
-		} 
+	/**
+	 * Handles keyPress and keyRelease events to be sent to connected device
+	 * 
+	 * @param keyCode
+	 * @param modifiers
+	 * @param type
+	 */
+	private void keyEventHandler(int keyCode, int modifiers, TouchPressType type) {
+		String code = null;
+		String stype = (type == TouchPressType.DOWN)?"DOWN":"UP";
+		
+		// don't stream multiple Back keyDowns, because only the first one matters 
+		if (( keyCode == KeyEvent.VK_ESCAPE ) && 
+				(keysPressed.contains(KeyEvent.VK_ESCAPE)) &&
+				(type == TouchPressType.DOWN))
+			return;
+		
+		// look up the Java keycode in the Map, exit early if a match can't be found
+		try {
+			code = keyCodeMap.get(keyCode);
+		} catch (Exception e) {
+			toConsole("[" + Integer.toString(keyCode) + ":" + Integer.toString(modifiers) + "] KEYCODE_UNKNOWN " + stype);
+			return;
+		}
+
+		toConsole("[" + Integer.toString(keyCode) + ":" + Integer.toString(modifiers) + "] " + code + " " + stype);
+
+		// make sure the state of the key is properly stored
+		switch(type) {
+		case DOWN:keysPressed.add(keyCode); break;
+		case UP:keysPressed.remove(keyCode); break;
+		}
+
+		// DOWN_AND_UP is a special case reserved for use by resetKeysPressed()
+		if (type == TouchPressType.DOWN_AND_UP) type = TouchPressType.UP;
+		
+		// actually send the key event if we're connected to a device
+		if ((this.connectedDeviceId != null) && (type != TouchPressType.DOWN_AND_UP)) {
+			mDevice.press(code, type);
+		}
+
 	}
-	
-	
+
+	/**
+	 * iterate over items in keysPressed to return all keys to an unpressed state
+	 * this is useful as a deadfall switch to quickly return all keys issued a down command
+	 * a matching up command in the event of lost focus
+	 */
+	private void resetKeysPressed() {
+		Iterator<Integer> iter = keysPressed.iterator();
+		int code;
+	    while (iter.hasNext()) {
+			if (this.connectedDeviceId != null) {
+				code = iter.next();
+				keyEventHandler(code, 0, TouchPressType.DOWN_AND_UP);
+			} 
+	    }
+	}
 	
 	/**
 	 * Launch the application.
@@ -273,7 +328,6 @@ public class MonkeyBoard {
 		btnRefresh.addMouseListener(new MouseAdapter() {
 			@Override
 			public void mouseClicked(MouseEvent arg0) {
-				toConsole("refreshing device list...");
 				refreshDeviceList();
 			}
 		});
@@ -316,28 +370,23 @@ public class MonkeyBoard {
 		btnMonkeyBoard.addKeyListener(new KeyAdapter() {
 			@Override
 			public void keyPressed(KeyEvent e) {
-//				keyPressStatus++;
-//				btnMonkeyBoard.setSelected(true);
-				
-				sendKeyToDevice(e.getKeyCode(), e.getModifiers());
+				keyEventHandler(e.getKeyCode(), e.getModifiers(), TouchPressType.DOWN);
 			}
 			@Override
 			public void keyReleased(KeyEvent e) {
-//				keyPressStatus--;
-//				if ( keyPressStatus <= 0 ) {
-//					btnMonkeyBoard.setSelected(false);
-//				}
+				keyEventHandler(e.getKeyCode(), e.getModifiers(), TouchPressType.UP);
 			}
 		});
 		btnMonkeyBoard.addFocusListener(new FocusAdapter() {
 			@Override
 			public void focusLost(FocusEvent arg0) {
-				//keyPressStatus = 0;
+				toConsole("key events released");
 				btnMonkeyBoard.setSelected(false);
+				resetKeysPressed();
 			}
 			@Override
 			public void focusGained(FocusEvent arg0) {
-				//keyPressStatus = 0;
+				toConsole("key events trapped");
 				btnMonkeyBoard.setSelected(true);
 			}
 		});	
@@ -491,5 +540,90 @@ public class MonkeyBoard {
 		JMenuItem mntmVolumeDown = new JMenuItem("Volume Down");
 		mntmVolumeDown.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_MINUS, InputEvent.META_MASK));
 		mnKeys.add(mntmVolumeDown);
+	}
+	
+	public void initializeKeyCodeMap() {
+		// modifiers
+		keyCodeMap.put(KeyEvent.VK_SHIFT, "KEYCODE_SHIFT_LEFT");
+		keyCodeMap.put(KeyEvent.VK_CONTROL, "KEYCODE_CTRL_LEFT");					
+		keyCodeMap.put(KeyEvent.VK_ALT, "KEYCODE_ALT_LEFT");
+	
+		// alphanumeric
+		keyCodeMap.put(KeyEvent.VK_A, "KEYCODE_A");
+		keyCodeMap.put(KeyEvent.VK_B, "KEYCODE_B");
+		keyCodeMap.put(KeyEvent.VK_C, "KEYCODE_C");
+		keyCodeMap.put(KeyEvent.VK_D, "KEYCODE_D");
+		keyCodeMap.put(KeyEvent.VK_E, "KEYCODE_E");
+		keyCodeMap.put(KeyEvent.VK_F, "KEYCODE_F");
+		keyCodeMap.put(KeyEvent.VK_G, "KEYCODE_G");
+		keyCodeMap.put(KeyEvent.VK_H, "KEYCODE_H");
+		keyCodeMap.put(KeyEvent.VK_I, "KEYCODE_I");
+		keyCodeMap.put(KeyEvent.VK_J, "KEYCODE_J");
+		keyCodeMap.put(KeyEvent.VK_K, "KEYCODE_K");
+		keyCodeMap.put(KeyEvent.VK_L, "KEYCODE_L");
+		keyCodeMap.put(KeyEvent.VK_M, "KEYCODE_M");
+		keyCodeMap.put(KeyEvent.VK_N, "KEYCODE_N");
+		keyCodeMap.put(KeyEvent.VK_O, "KEYCODE_O");
+		keyCodeMap.put(KeyEvent.VK_P, "KEYCODE_P");
+		keyCodeMap.put(KeyEvent.VK_Q, "KEYCODE_Q");
+		keyCodeMap.put(KeyEvent.VK_R, "KEYCODE_R");
+		keyCodeMap.put(KeyEvent.VK_S, "KEYCODE_S");
+		keyCodeMap.put(KeyEvent.VK_T, "KEYCODE_T");
+		keyCodeMap.put(KeyEvent.VK_U, "KEYCODE_U");
+		keyCodeMap.put(KeyEvent.VK_V, "KEYCODE_V");
+		keyCodeMap.put(KeyEvent.VK_W, "KEYCODE_W");
+		keyCodeMap.put(KeyEvent.VK_X, "KEYCODE_X");
+		keyCodeMap.put(KeyEvent.VK_Y, "KEYCODE_Y");
+		keyCodeMap.put(KeyEvent.VK_Z, "KEYCODE_Z");
+		keyCodeMap.put(KeyEvent.VK_0, "KEYCODE_0");
+		keyCodeMap.put(KeyEvent.VK_1, "KEYCODE_1");
+		keyCodeMap.put(KeyEvent.VK_2, "KEYCODE_2");
+		keyCodeMap.put(KeyEvent.VK_3, "KEYCODE_3");
+		keyCodeMap.put(KeyEvent.VK_4, "KEYCODE_4");
+		keyCodeMap.put(KeyEvent.VK_5, "KEYCODE_5");
+		keyCodeMap.put(KeyEvent.VK_6, "KEYCODE_6");
+		keyCodeMap.put(KeyEvent.VK_7, "KEYCODE_7");
+		keyCodeMap.put(KeyEvent.VK_8, "KEYCODE_8");
+		keyCodeMap.put(KeyEvent.VK_9, "KEYCODE_9");
+		
+		// dpad
+		keyCodeMap.put(KeyEvent.VK_UP, "KEYCODE_DPAD_UP");
+		keyCodeMap.put(KeyEvent.VK_DOWN, "KEYCODE_DPAD_DOWN");
+		keyCodeMap.put(KeyEvent.VK_LEFT, "KEYCODE_DPAD_LEFT");
+		keyCodeMap.put(KeyEvent.VK_RIGHT, "KEYCODE_DPAD_RIGHT");
+		//keyCodeMap.put(KeyEvent.VK_ENTER, "KEYCODE_DPAD_CENTER";
+		
+		//keyCodeMap.put(KeyEvent.VK_SOFT_LEFT, "KEYCODE_SOFT_LEFT";
+		//keyCodeMap.put(KeyEvent.VK_SOFT_RIGHT, "KEYCODE_SOFT_RIGHT";
+		keyCodeMap.put(KeyEvent.VK_HOME, "KEYCODE_HOME");
+		keyCodeMap.put(KeyEvent.VK_ESCAPE, "KEYCODE_BACK");
+		//keyCodeMap.put(KeyEvent.VK_CALL, "KEYCODE_CALL";
+		//keyCodeMap.put(KeyEvent.VK_ENDCALL, "KEYCODE_ENDCALL";
+		//keyCodeMap.put(KeyEvent.VK_STAR, "KEYCODE_STAR";
+		//keyCodeMap.put(KeyEvent.VK_POUND, "KEYCODE_POUND";
+		//keyCodeMap.put(KeyEvent.VK_VOLUME_UP, "KEYCODE_VOLUME_UP";
+		//keyCodeMap.put(KeyEvent.VK_VOLUME_DOWN, "KEYCODE_VOLUME_DOWN";
+		//keyCodeMap.put(KeyEvent.VK_POWER, "KEYCODE_POWER";
+		//keyCodeMap.put(KeyEvent.VK_CAMERA, "KEYCODE_CAMERA";
+		//keyCodeMap.put(KeyEvent.VK_CLEAR, "KEYCODE_CLEAR";
+		keyCodeMap.put(KeyEvent.VK_COMMA, "KEYCODE_COMMA");
+		keyCodeMap.put(KeyEvent.VK_PERIOD, "KEYCODE_PERIOD");
+		keyCodeMap.put(KeyEvent.VK_TAB, "KEYCODE_TAB");
+		keyCodeMap.put(KeyEvent.VK_SPACE, "KEYCODE_SPACE");
+		keyCodeMap.put(KeyEvent.VK_ENTER, "KEYCODE_ENTER");
+		keyCodeMap.put(KeyEvent.VK_DELETE, "KEYCODE_DEL");
+		keyCodeMap.put(KeyEvent.VK_BACK_SPACE, "KEYCODE_DEL");
+		keyCodeMap.put(KeyEvent.VK_DEAD_GRAVE, "KEYCODE_GRAVE");
+		keyCodeMap.put(KeyEvent.VK_MINUS, "KEYCODE_MINUS");
+		keyCodeMap.put(KeyEvent.VK_EQUALS, "KEYCODE_EQUALS");
+		keyCodeMap.put(KeyEvent.VK_OPEN_BRACKET, "KEYCODE_LEFT_BRACKET");
+		keyCodeMap.put(KeyEvent.VK_CLOSE_BRACKET, "KEYCODE_RIGHT_BRACKET");
+		keyCodeMap.put(KeyEvent.VK_BACK_SLASH, "KEYCODE_BACKSLASH");
+		keyCodeMap.put(KeyEvent.VK_SEMICOLON, "KEYCODE_SEMICOLON");
+		keyCodeMap.put(KeyEvent.VK_SLASH, "KEYCODE_SLASH");
+		keyCodeMap.put(KeyEvent.VK_AT, "KEYCODE_AT");
+		keyCodeMap.put(KeyEvent.VK_PLUS, "KEYCODE_PLUS");
+		keyCodeMap.put(KeyEvent.VK_PAGE_UP, "KEYCODE_PAGE_UP");
+		keyCodeMap.put(KeyEvent.VK_PAGE_DOWN, "KEYCODE_PAGE_DOWN");
 	}
 }
