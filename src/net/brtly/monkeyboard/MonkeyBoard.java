@@ -43,6 +43,7 @@ import javax.swing.text.SimpleAttributeSet;
 
 import java.awt.Cursor;
 import java.awt.Event;
+import java.awt.FileDialog;
 import java.awt.Rectangle;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
@@ -73,29 +74,36 @@ public class MonkeyBoard {
     private IChimpDevice mDevice; 
     private String connectedDeviceId = null;
     
-    private static final String ANDROID_SDK = "/Users/obartley/Library/android-sdk-macosx-r15/";
+    private static final String ANDROID_SDK = "/Users/obartley/Library/android-sdk-macosx/";
     private static final String ADB = ANDROID_SDK + "platform-tools/adb";
+    private static final String EMULATOR = ANDROID_SDK + "tools/emulator";
     private static final long TIMEOUT = 5000;
     private static final int REFRESH_DELAY = 1000;
 	    
     // lookup table to translate from Java keycodes to Android
     private Map<Integer, String> keyCodeMap = new TreeMap<Integer, String>();
     
-    // Set to track which android keycodes are currently in a down state
+    // Set to track which android keycodes are currently in a down state,
+    // so that they can be quickly matched with a keyup in the event of a focus lost event
     private Set<String> keysPressed = new HashSet<String>();
     
 	/**
 	 * Create the application.
 	 */
 	public MonkeyBoard() {
+		// warmup!
 		initialize(); // this method is only for GUI elements manipulated on Design tab
 		initializeKeyCodeMap();
 		refreshDeviceList();
+		
+		// create the adb backend
 		TreeMap<String, String> options = new TreeMap<String, String>();
         options.put("backend", "adb");
         options.put("adbLocation", ADB);
 		mChimpChat = ChimpChat.getInstance(options);
 		@SuppressWarnings("serial")
+		
+		// create the timer that refreshes the device list
 		AbstractAction timerAction = new AbstractAction() {
 		    public void actionPerformed(ActionEvent e) {
 		    	refreshDeviceList();
@@ -107,6 +115,7 @@ public class MonkeyBoard {
 	
 	/**
 	 *  Append a String to the text in the console and force scrolling to the end of the doc
+	 *  basically a Log
 	 */
 	public void toConsole(String arg0) {
 		try {
@@ -138,13 +147,8 @@ public class MonkeyBoard {
 		// execute cmd
 		try {
 			pr = run.exec(cmd);
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-		
-		try {
 			pr.waitFor();
-		} catch (InterruptedException e) {
+		} catch (Exception e) {
 			e.printStackTrace();
 		}
 		
@@ -165,72 +169,121 @@ public class MonkeyBoard {
 	}	
 
 	/**
-	 * execute a shell command via
-	 * adb -s connectedDeviceId shell cmd
+	 * execute an adb command via
+	 * adb -s connectedDeviceId cmd
+	 * useful for uninstalling packages, etc
 	 */
-	private void execAdbCommand(String args) {
-		Runtime run = Runtime.getRuntime();
-		Process pr = null;
+	private void execAdbCommand(final String args) {
+		// threaded subprocess
+		SwingWorker <Object, Void> worker = new SwingWorker<Object, Void>() {
+		    @Override
+		    public Object doInBackground() {
+				Runtime run = Runtime.getRuntime();
+				Process pr = null;
+				
+				if (args == null) return null;
+				if (connectedDeviceId == null) return null;
+				
+				String cmd = ADB + " -s " + connectedDeviceId + " " + args;
+				toConsole(">>> " + cmd);
+				
+				// execute cmd
+				try {
+					pr = run.exec(cmd);
+					pr.waitFor();
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
+				
+				// parse output
+				BufferedReader buf = new BufferedReader(new InputStreamReader(pr.getInputStream()));
+				String line = "";
+				try {
+					while ((line=buf.readLine())!=null) {
+						toConsole(".   " + line);
+					}
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+				return null;
+		    }
+		};
+		worker.execute();
+	}
+	/**
+	 * the only reason this one is used exclusively for install is because
+	 * the default process runner used in execAdbCommand treats whitespace as delimiting arguments, regardless of
+	 * escape chars or quotes. Because some filepaths use spaces O_o, we need to pass the args as an array instead
+	 * @param apkPath
+	 */
+	private void execAdbInstallCommand(final String apkPath) {
+		SwingWorker <Object, Void> worker = new SwingWorker<Object, Void>() {
+		    @Override
+		    public Object doInBackground() {
+				Runtime run = Runtime.getRuntime();
+				Process pr = null;
+				
+				if (apkPath == null) return null;
+				if (connectedDeviceId == null) return null;
+				
+				String[] cmd = {ADB, "-s", connectedDeviceId, "install", apkPath};
 		
-		if (args == null) return;
-		if (connectedDeviceId == null) return;
-		
-		String cmd = ADB + " -s " + connectedDeviceId + " " + args;
+				toConsole(">>> " + ADB + " -s " + connectedDeviceId + " install " + '"' + apkPath + '"');
+				
+				// execute cmd
+				try {
+					pr = run.exec(cmd);
+					pr.waitFor();
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
+				
+				// parse output
+				BufferedReader buf = new BufferedReader(new InputStreamReader(pr.getInputStream()));
+				String line = "";
+				try {
+					while ((line=buf.readLine())!=null) {
+						toConsole(".   " + line);
+					}
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+				return null;
+		    }
+		};
+		worker.execute();
+	}
 
-		toConsole(">>> " + cmd);
-		
-		// execute cmd
-		try {
-			pr = run.exec(cmd);
-			pr.waitFor();
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		
-		// parse output
-		BufferedReader buf = new BufferedReader(new InputStreamReader(pr.getInputStream()));
-		String line = "";
-		try {
-			while ((line=buf.readLine())!=null) {
-				toConsole(".   " + line);
-			}
-		} catch (IOException e) {
-			e.printStackTrace();
-		} 
+	/**
+	 * Given the name of an AVD, launch an emulator instance of it in a worker thread
+	 * @param name
+	 */
+	private void startAvd(final String name) {
+		SwingWorker <Object, Void> worker = new SwingWorker<Object, Void>() {
+		    @Override
+		    public Object doInBackground() {
+				Runtime run = Runtime.getRuntime();
+				Process pr = null;
+				
+				String cmd = EMULATOR + " -avd " + name;
+
+				toConsole(">>> " + cmd);
+				
+				// execute cmd
+				try {
+					pr = run.exec(cmd);
+					pr.waitFor();
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
+				return null;
+		    }
+		};
+		// now run the thread
+		worker.execute();
 	}
 	
-	private void execAdbInstallCommand(String apkPath) {
-		Runtime run = Runtime.getRuntime();
-		Process pr = null;
-		
-		if (apkPath == null) return;
-		if (connectedDeviceId == null) return;
-		
-		String[] cmd = {ADB, "-s", connectedDeviceId, "install", apkPath};
-
-		toConsole(">>> " + ADB + " -s " + connectedDeviceId + " install " + apkPath);
-		
-		// execute cmd
-		try {
-			pr = run.exec(cmd);
-			pr.waitFor();
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		
-		// parse output
-		BufferedReader buf = new BufferedReader(new InputStreamReader(pr.getInputStream()));
-		String line = "";
-		try {
-			while ((line=buf.readLine())!=null) {
-				toConsole(".   " + line);
-			}
-		} catch (IOException e) {
-			e.printStackTrace();
-		} 
-		
-	}
-
+	
 	/**
 	 * refreshes data in listModel to reflect the current status of devices connected to adb
 	 */
@@ -241,7 +294,9 @@ public class MonkeyBoard {
 		String selectedElement = null;
 		int selectedIndex = -1;
 		int i = 0;
+		
 		// save a reference to the currently selected item
+		// so we can reselect it after the list is rebuilt
 		try {
 			selectedElement = listModel.getElementAt(listView.getSelectedIndex()).toString();
 		} catch (Exception e) {
@@ -250,7 +305,6 @@ public class MonkeyBoard {
 		
 		// iterate over the items in adb
 		listModel.clear();
-		
 		while (adbDevices.hasNext()) {
 			Entry<String, String> dev =  (Entry<String, String>) adbDevices.next();
 
@@ -260,15 +314,17 @@ public class MonkeyBoard {
 
 			// build list element
 			if ( devId.equals(connectedDeviceId) ) {
+				// some special treatment for the device matching connectedDeviceId
 				devStatus = "connected";
 				foundConnectedDevice = true;
 			}
-			//System.out.println("(" + this.connectedDeviceId + ")" + devId + ":" + devStatus);
 			elem.put("deviceId", devId);
 			elem.put("deviceStatus", devStatus);
 			listModel.addElement(elem);
 			
 			if (selectedElement.contains(devId))
+				// we found a match to the previously selected device
+				// save an index to it
 				selectedIndex = i;
 			i++;
 		}
@@ -356,12 +412,46 @@ public class MonkeyBoard {
 	
 	/**
 	 * iterate over items in deviceMenuItems and call .setEnabled(b)
+	 * this is used when connecting/disconnecting to a device
 	 * @param b
 	 */
 	private void setDeviceMenuItemsEnabled(Boolean b) {
 		Iterator<JMenuItem> iter = deviceMenuItems.iterator();		
 		while (iter.hasNext()) {
 			iter.next().setEnabled(b);
+		}
+	}
+	
+	/**
+	 * 
+	 */
+	private void getDeviceProperties() {
+		String[] props = {"build.board",
+		     	"build.brand",
+		     	"build.device",
+		     	"build.fingerprint",
+		     	"build.host",
+		     	"build.ID",
+		     	"build.model",
+		     	"build.product",
+		     	"build.tags",
+		     	"build.type",
+		     	"build.user",
+		     	"build.CPU_ABI",
+		     	"build.manufacturer",
+		     	"build.version.incremental",
+		     	"build.version.release",
+		     	"build.version.codename",
+		     	"display.width",
+		     	"display.height",
+		     	"display.density"};
+		toConsole("Device properties for " + connectedDeviceId);
+		try {
+			for (int i = 0; i < props.length; i++ ) {
+				toConsole(String.format("%1$-" + 30 + "s", props[i]) + mDevice.getProperty(props[i]));
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
 		}
 	}
 	
@@ -401,14 +491,12 @@ public class MonkeyBoard {
 				if ((isCtrl && (type == TouchPressType.DOWN)) || 
 						(keysPressed.contains("KEYCODE_CAMERA")))
 					code = "KEYCODE_CAMERA"; 
-				break;
-				
+				break;				
 			case KeyEvent.VK_F5:
 				if ((isCtrl && (type == TouchPressType.DOWN)) || 
 						(keysPressed.contains("KEYCODE_VOLUME_UP")))
 					code = "KEYCODE_VOLUME_UP"; 
 				break;
-				
 			case KeyEvent.VK_F6:
 				if ((isCtrl && (type == TouchPressType.DOWN)) || 
 						(keysPressed.contains("KEYCODE_VOLUME_DOWN")))
@@ -421,37 +509,31 @@ public class MonkeyBoard {
 						(keysPressed.contains("KEYCODE_MENU")))
 					code = "KEYCODE_MENU"; 
 				break;
-				
 			case KeyEvent.VK_S:
 				if ((isCtrl && (type == TouchPressType.DOWN)) || 
 						(keysPressed.contains("KEYCODE_SEARCH")))
 					code = "KEYCODE_SEARCH"; 
 				break;
-			
 			case KeyEvent.VK_H:
 				if ((isCtrl && (type == TouchPressType.DOWN)) || 
 						(keysPressed.contains("KEYCODE_HOME")))
 					code = "KEYCODE_HOME"; 
 				break;
-				
 			case KeyEvent.VK_P:
 				if ((isCtrl && (type == TouchPressType.DOWN)) || 
 						(keysPressed.contains("KEYCODE_POWER")))
 					code = "KEYCODE_POWER"; 
 				break;
-				
 			case KeyEvent.VK_C:
 				if ((isCtrl && (type == TouchPressType.DOWN)) || 
 						(keysPressed.contains("KEYCODE_CAMERA")))
 					code = "KEYCODE_CAMERA"; 
 				break;
-				
 			case KeyEvent.VK_MINUS:
 				if ((isCtrl && (type == TouchPressType.DOWN)) || 
 						(keysPressed.contains("KEYCODE_VOLUME_DOWN")))
 					code = "KEYCODE_VOLUME_DOWN"; 
 				break;
-				
 			case KeyEvent.VK_EQUALS:
 				if ((isCtrl && (type == TouchPressType.DOWN)) || 
 						(keysPressed.contains("KEYCODE_VOLUME_UP")))
@@ -649,12 +731,10 @@ public class MonkeyBoard {
 		
 		JMenuItem mntmRestartAdbServer = new JMenuItem("Restart adb server");
 		mntmRestartAdbServer.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_R, InputEvent.META_MASK));
-		mntmRestartAdbServer.setMnemonic('r');
 		mnFile.add(mntmRestartAdbServer);		
 		
 		JMenuItem mntmRefreshDeviceList = new JMenuItem("Refresh Device List");
 		mntmRefreshDeviceList.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_L, InputEvent.META_MASK));
-		mntmRefreshDeviceList.setMnemonic('l');
 		mntmRefreshDeviceList.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent arg0) {
 			toConsole("refreshing device list...");
@@ -672,6 +752,21 @@ public class MonkeyBoard {
 		mntmConnectToDevice.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_N, InputEvent.META_MASK));
 		mnFile.add(mntmConnectToDevice);
 		
+		JSeparator separator = new JSeparator();
+		mnFile.add(separator);
+		
+		JMenuItem mntmLaunchEmulator = new JMenuItem("Launch Emulator...");
+		mntmLaunchEmulator.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent arg0) {
+				Component source = (Component) arg0.getSource();
+				String avd = JOptionPane.showInputDialog(source,
+		                "Enter the name of the AVD you want to lauch:");
+				startAvd(avd);
+			}
+		});
+		mntmLaunchEmulator.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_E, InputEvent.META_MASK));
+		mnFile.add(mntmLaunchEmulator);
+		
 		mnFile.add(new JSeparator());
 		
 		JMenuItem mntmInstallapk = new JMenuItem("Install *.apk...");
@@ -682,12 +777,13 @@ public class MonkeyBoard {
 				// Show a file chooser dialog and
 				// issue an adb install command if the filepath
 				// return contains '.apk'
-				Component source = (Component) arg0.getSource();
-				JFileChooser fc = new JFileChooser();
-				fc.showOpenDialog(source);
-				String apk = fc.getSelectedFile().getAbsolutePath();
+				FileDialog fd = new FileDialog(frmMonkeyboard, "Select an .apk package to install");
+				fd.show();
+				String apk = fd.getDirectory() + fd.getFile();
 				if (apk.contains(".apk"))
 					execAdbInstallCommand(apk);
+				
+				
 			}
 		});
 		
@@ -701,7 +797,7 @@ public class MonkeyBoard {
 			public void actionPerformed(ActionEvent arg0) {
 				Component source = (Component) arg0.getSource();
 				String cmd = JOptionPane.showInputDialog(source,
-		                "enter adb command");
+		                "Enter adb command:");
 				execAdbCommand(cmd);
 			}
 		});
@@ -709,6 +805,11 @@ public class MonkeyBoard {
 		deviceMenuItems.add(mntmExecuteShellCommand);
 		
 		JMenuItem mntmGetDeviceProperties = new JMenuItem("Get Device Properties");
+		mntmGetDeviceProperties.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent arg0) {
+				getDeviceProperties();
+			}
+		});
 		mntmGetDeviceProperties.setEnabled(false);
 		mntmGetDeviceProperties.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_P, InputEvent.META_MASK));
 		mnFile.add(mntmGetDeviceProperties);
