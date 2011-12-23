@@ -1,17 +1,20 @@
 package net.brtly.monkeyboard;
 
-import java.awt.EventQueue;
-
+import javax.swing.AbstractAction;
+import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JList;
 import javax.swing.JButton;
 import javax.swing.DefaultListModel;
 import javax.swing.GroupLayout;
 import javax.swing.GroupLayout.Alignment;
+import javax.swing.JOptionPane;
 import javax.swing.JSeparator;
 import javax.swing.KeyStroke;
 import javax.swing.LayoutStyle.ComponentPlacement;
 import javax.swing.ImageIcon;
+import javax.swing.SwingWorker;
+import javax.swing.Timer;
 
 import com.android.chimpchat.ChimpChat;
 import com.android.chimpchat.core.IChimpDevice;
@@ -22,6 +25,7 @@ import java.awt.event.MouseEvent;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -52,14 +56,17 @@ import javax.swing.SwingConstants;
 import java.awt.Font;
 import javax.swing.JScrollPane;
 import java.awt.event.InputEvent;
-import java.awt.SystemColor;
-import javax.swing.JCheckBoxMenuItem;
+import java.awt.Color;
 
 public class MonkeyBoard {
 	private DefaultListModel listModel = new DefaultListModel();
 	private JList listView = null;
 	private JButton btnMonkeyBoard = null;
 	private JTextPane textConsole = null;
+	private ArrayList<JMenuItem> deviceMenuItems = new ArrayList<JMenuItem>(); //stores a reference to all menu items that need to be
+		//disabled when there isn't a device connected.
+	private Timer tmrRefresh = null;
+	
 	JFrame frmMonkeyboard;
 
     private ChimpChat mChimpChat;
@@ -69,7 +76,8 @@ public class MonkeyBoard {
     private static final String ANDROID_SDK = "/Users/obartley/Library/android-sdk-macosx-r15/";
     private static final String ADB = ANDROID_SDK + "platform-tools/adb";
     private static final long TIMEOUT = 5000;
-	
+    private static final int REFRESH_DELAY = 1000;
+	    
     // lookup table to translate from Java keycodes to Android
     private Map<Integer, String> keyCodeMap = new TreeMap<Integer, String>();
     
@@ -80,13 +88,21 @@ public class MonkeyBoard {
 	 * Create the application.
 	 */
 	public MonkeyBoard() {
-		initialize();
+		initialize(); // this method is only for GUI elements manipulated on Design tab
 		initializeKeyCodeMap();
 		refreshDeviceList();
 		TreeMap<String, String> options = new TreeMap<String, String>();
         options.put("backend", "adb");
         options.put("adbLocation", ADB);
 		mChimpChat = ChimpChat.getInstance(options);
+		@SuppressWarnings("serial")
+		AbstractAction timerAction = new AbstractAction() {
+		    public void actionPerformed(ActionEvent e) {
+		    	refreshDeviceList();
+		    }
+		};
+		tmrRefresh = new Timer(REFRESH_DELAY, timerAction);
+		tmrRefresh.start();
 	}
 	
 	/**
@@ -115,7 +131,6 @@ public class MonkeyBoard {
 		Map<String, String> rv = new HashMap<String, String>();
 		// Capture output from `adb devices` and map connected deviceIds to their status
 		// TODO: remove absolute path to adb or make dynamic
-		
 		String cmd = ADB + " devices";
 		Runtime run = Runtime.getRuntime();
 		Process pr = null;
@@ -148,7 +163,74 @@ public class MonkeyBoard {
 		} 
 		return rv;
 	}	
+
+	/**
+	 * execute a shell command via
+	 * adb -s connectedDeviceId shell cmd
+	 */
+	private void execAdbCommand(String args) {
+		Runtime run = Runtime.getRuntime();
+		Process pr = null;
+		
+		if (args == null) return;
+		if (connectedDeviceId == null) return;
+		
+		String cmd = ADB + " -s " + connectedDeviceId + " " + args;
+
+		toConsole(">>> " + cmd);
+		
+		// execute cmd
+		try {
+			pr = run.exec(cmd);
+			pr.waitFor();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+		// parse output
+		BufferedReader buf = new BufferedReader(new InputStreamReader(pr.getInputStream()));
+		String line = "";
+		try {
+			while ((line=buf.readLine())!=null) {
+				toConsole(".   " + line);
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+		} 
+	}
 	
+	private void execAdbInstallCommand(String apkPath) {
+		Runtime run = Runtime.getRuntime();
+		Process pr = null;
+		
+		if (apkPath == null) return;
+		if (connectedDeviceId == null) return;
+		
+		String[] cmd = {ADB, "-s", connectedDeviceId, "install", apkPath};
+
+		toConsole(">>> " + ADB + " -s " + connectedDeviceId + " install " + apkPath);
+		
+		// execute cmd
+		try {
+			pr = run.exec(cmd);
+			pr.waitFor();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+		// parse output
+		BufferedReader buf = new BufferedReader(new InputStreamReader(pr.getInputStream()));
+		String line = "";
+		try {
+			while ((line=buf.readLine())!=null) {
+				toConsole(".   " + line);
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+		} 
+		
+	}
+
 	/**
 	 * refreshes data in listModel to reflect the current status of devices connected to adb
 	 */
@@ -156,10 +238,19 @@ public class MonkeyBoard {
 		Map<String, String> adb = getAdbStatus();
 		Iterator<Entry<String, String>> adbDevices = adb.entrySet().iterator();
 		Boolean foundConnectedDevice = false;
+		String selectedElement = null;
+		int selectedIndex = -1;
+		int i = 0;
+		// save a reference to the currently selected item
+		try {
+			selectedElement = listModel.getElementAt(listView.getSelectedIndex()).toString();
+		} catch (Exception e) {
+			selectedElement = "";
+		}
 		
 		// iterate over the items in adb
-		// TODO: make listModel items persist and update the list on an interval
 		listModel.clear();
+		
 		while (adbDevices.hasNext()) {
 			Entry<String, String> dev =  (Entry<String, String>) adbDevices.next();
 
@@ -175,48 +266,103 @@ public class MonkeyBoard {
 			//System.out.println("(" + this.connectedDeviceId + ")" + devId + ":" + devStatus);
 			elem.put("deviceId", devId);
 			elem.put("deviceStatus", devStatus);
-			
-			// TODO: make elements persist between refreshes
-//			// check to see if there's already an entry in listModel
-//			if ( ! listModel.contains(elem)) {
-//				listModel.addElement(elem);
-//			}
 			listModel.addElement(elem);
+			
+			if (selectedElement.contains(devId))
+				selectedIndex = i;
+			i++;
 		}
 		
 		if ( ! foundConnectedDevice) {
 			// a deviceId matching connectedDevcieId was not found, reset connection
-			connectedDeviceId = null;
-			if (mDevice != null)
-				mDevice.dispose();
-			mDevice = null;
+			disconnectFromDevice();
 		}
+		
+		// if a match was found in the above loop, then this will be true
+		if (selectedIndex > -1)
+			listView.setSelectedIndex(selectedIndex);
 		
 		// now we scrub the list for stuff that isn't in the deviceList anymore
 		if ( listModel.getSize() > 0) {
-			for (int i = 0; i == listModel.getSize(); i++) {
+			for (i = 0; i == listModel.getSize(); i++) {
 				if (adb.keySet().contains(listModel.getElementAt(i)))
 					listModel.remove(i);
 			}
 		}
 	}
 	
-	private void connectToDevice(String deviceId) {
-		//TODO: maybe make this threaded, so an unresponsive emulator/device
-		// doesn't block the main thread
-		try {
-	        mDevice = mChimpChat.waitForConnection(TIMEOUT, deviceId);
-	        if ( mDevice == null ) throw new RuntimeException("Couldn't connect.");
-	        mDevice.wake();
-	        this.connectedDeviceId = deviceId;
-	        toConsole("connected to device: " + deviceId);
-		} catch (Exception e) {
-			e.printStackTrace();
+	/**
+	 * define a background thread to connect to the device selected in the list
+	 */
+	@SuppressWarnings("unchecked")
+	private void connectToDevice() {
+		// define the worker
+		SwingWorker <Object, Void> worker = new SwingWorker<Object, Void>() {
+		    @Override
+		    public Object doInBackground() {
+			HashMap<String, String> v;
+			String deviceId = null;
+			
+			// get the device id from the selected list element
+			try {
+				v = (HashMap<String, String>) listView.getSelectedValue();	
+				deviceId = v.get("deviceId");
+			} catch (Exception ex) {
+				ex.printStackTrace();
+				disconnectFromDevice();
+				refreshDeviceList();
+				return null;
+			}
+	
+			// if the device is already selected, disconnect instead
+			if (deviceId.equals(connectedDeviceId)) {
+				disconnectFromDevice();
+				refreshDeviceList();
+				return null;
+			}
+	
+			//get a connection to the device
+			try {
+		        mDevice = mChimpChat.waitForConnection(TIMEOUT, deviceId);
+		        if ( mDevice == null ) throw new RuntimeException("Couldn't connect.");
+		        mDevice.wake();
+		        connectedDeviceId = deviceId;
+		        toConsole("connected to device: " + deviceId);
+		        setDeviceMenuItemsEnabled(true);
+			} catch (Exception e) {
+				e.printStackTrace();
+				disconnectFromDevice();
+	        	toConsole("couldn't connect to device: " + deviceId);    
+			}
+			refreshDeviceList();
+		  	return null;
+		    }
+		};
+		// now run the thread
+		worker.execute();
+	}
+	
+	/**
+	 * handles disposing of connection object and disabling menu items that require a connected device
+	 */
+	private void disconnectFromDevice() {
+		connectedDeviceId = null;
+		if (mDevice != null) {
+			mDevice.dispose();
 			mDevice = null;
-			connectedDeviceId = null;
-        	toConsole("couldn't connect to device: " + deviceId);    
 		}
-        this.refreshDeviceList();
+		setDeviceMenuItemsEnabled(false);
+	}
+	
+	/**
+	 * iterate over items in deviceMenuItems and call .setEnabled(b)
+	 * @param b
+	 */
+	private void setDeviceMenuItemsEnabled(Boolean b) {
+		Iterator<JMenuItem> iter = deviceMenuItems.iterator();		
+		while (iter.hasNext()) {
+			iter.next().setEnabled(b);
+		}
 	}
 	
 	/**
@@ -320,7 +466,8 @@ public class MonkeyBoard {
 		if ( code == null ) return;
 		
 		// if it's a keydown and there's already a reference in keysPressed, don't send another keydown 
-		if ((keysPressed.contains(code)) &&
+		if ((! code.contains("DPAD")) &&
+				(keysPressed.contains(code)) && // only allow spamming trackball commands
 				(type == TouchPressType.DOWN))
 			return;
 		
@@ -334,7 +481,7 @@ public class MonkeyBoard {
 		}
 		
 		// actually send the key event if we're connected to a device
-		if (this.connectedDeviceId != null)  {
+		if (connectedDeviceId != null)  {
 			mDevice.press(code, type);
 		}
 	}
@@ -350,7 +497,7 @@ public class MonkeyBoard {
 	    while (iter.hasNext()) {
 	    	code = iter.next();
 	    	toConsole("[-:-] " + code + " RELEASE");
-			if (this.connectedDeviceId != null) {
+			if (connectedDeviceId != null) {
 				mDevice.press(code, TouchPressType.UP);
 			} 
 	    }
@@ -369,6 +516,18 @@ public class MonkeyBoard {
 		
 		// moved JList declaration to class-level declarartions
 		listView = new JList(listModel);
+		listView.addMouseListener(new MouseAdapter() {
+			@Override
+			public void mouseClicked(MouseEvent e) {
+				// double click to connect
+				if(e.getClickCount() == 2) {
+					int index = listView.locationToIndex(e.getPoint());
+					//Object item = listModel.getElementAt(index);;
+					listView.ensureIndexIsVisible(index);
+					connectToDevice();
+				}
+			}
+		});
 		listView.setAlignmentY(Component.TOP_ALIGNMENT);
 		listView.setAlignmentX(Component.LEFT_ALIGNMENT);
 		listView.setBorder(new BevelBorder(BevelBorder.LOWERED, null, null, null, null));
@@ -382,22 +541,12 @@ public class MonkeyBoard {
 		});
 		
 		JButton btnConnect = new JButton("Connect");
-		btnConnect.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent e) {
-			}
-		});
 		btnConnect.addMouseListener(new MouseAdapter() {
 			@Override
 			public void mouseClicked(MouseEvent e) {
-				try {
-					HashMap<String, String> v = (HashMap<String, String>) listView.getSelectedValue();
-					connectToDevice(v.get("deviceId"));
-				} catch (NullPointerException err) {
-					//Null pointer just means there isn't anything selected
-				}
+				connectToDevice();
 			}
-		});
-		
+		});		
 		btnMonkeyBoard = new JButton("");
 		btnMonkeyBoard.addMouseListener(new MouseAdapter() {
 			@Override
@@ -442,7 +591,7 @@ public class MonkeyBoard {
 		btnMonkeyBoard.setBorder(null);
 		btnMonkeyBoard.setIcon(new ImageIcon(MonkeyBoard.class.getResource("/res/android_large.png")));
 		
-		JScrollPane scrollPane = new JScrollPane();
+		JScrollPane consoleScrollPane = new JScrollPane();
 
 		GroupLayout groupLayout = new GroupLayout(frmMonkeyboard.getContentPane());
 		groupLayout.setHorizontalGroup(
@@ -451,7 +600,7 @@ public class MonkeyBoard {
 					.addContainerGap()
 					.addGroup(groupLayout.createParallelGroup(Alignment.LEADING)
 						.addGroup(groupLayout.createSequentialGroup()
-							.addComponent(scrollPane, GroupLayout.DEFAULT_SIZE, 438, Short.MAX_VALUE)
+							.addComponent(consoleScrollPane, GroupLayout.DEFAULT_SIZE, 438, Short.MAX_VALUE)
 							.addContainerGap())
 						.addGroup(groupLayout.createSequentialGroup()
 							.addGroup(groupLayout.createParallelGroup(Alignment.LEADING)
@@ -478,17 +627,17 @@ public class MonkeyBoard {
 								.addComponent(btnRefresh)))
 						.addComponent(btnMonkeyBoard, GroupLayout.PREFERRED_SIZE, 279, GroupLayout.PREFERRED_SIZE))
 					.addPreferredGap(ComponentPlacement.RELATED)
-					.addComponent(scrollPane, GroupLayout.DEFAULT_SIZE, 92, Short.MAX_VALUE)
+					.addComponent(consoleScrollPane, GroupLayout.DEFAULT_SIZE, 92, Short.MAX_VALUE)
 					.addContainerGap())
 		);
 		
 		textConsole = new JTextPane();
 		textConsole.setText("ready");
-		textConsole.setForeground(SystemColor.windowText);
+		textConsole.setForeground(new Color(255, 255, 255));
 		textConsole.setFont(new Font("Monospaced", Font.PLAIN, 15));
 		textConsole.setEditable(false);
-		textConsole.setBackground(SystemColor.window);
-		scrollPane.setViewportView(textConsole);
+		textConsole.setBackground(new Color(0, 0, 0));
+		consoleScrollPane.setViewportView(textConsole);
 		frmMonkeyboard.getContentPane().setLayout(groupLayout);
 		
 		JMenuBar menuBar = new JMenuBar();
@@ -500,11 +649,12 @@ public class MonkeyBoard {
 		
 		JMenuItem mntmRestartAdbServer = new JMenuItem("Restart adb server");
 		mntmRestartAdbServer.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_R, InputEvent.META_MASK));
+		mntmRestartAdbServer.setMnemonic('r');
 		mnFile.add(mntmRestartAdbServer);		
 		
 		JMenuItem mntmRefreshDeviceList = new JMenuItem("Refresh Device List");
 		mntmRefreshDeviceList.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_L, InputEvent.META_MASK));
-		mntmRefreshDeviceList.setMnemonic('r');
+		mntmRefreshDeviceList.setMnemonic('l');
 		mntmRefreshDeviceList.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent arg0) {
 			toConsole("refreshing device list...");
@@ -514,6 +664,11 @@ public class MonkeyBoard {
 		mnFile.add(mntmRefreshDeviceList);
 				
 		JMenuItem mntmConnectToDevice = new JMenuItem("Connect To Device");
+		mntmConnectToDevice.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent arg0) {
+				connectToDevice();
+			}
+		});
 		mntmConnectToDevice.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_N, InputEvent.META_MASK));
 		mnFile.add(mntmConnectToDevice);
 		
@@ -522,42 +677,62 @@ public class MonkeyBoard {
 		JMenuItem mntmInstallapk = new JMenuItem("Install *.apk...");
 		mntmInstallapk.setEnabled(false);
 		mntmInstallapk.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_I, InputEvent.META_MASK));
+		mntmInstallapk.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent arg0) {
+				// Show a file chooser dialog and
+				// issue an adb install command if the filepath
+				// return contains '.apk'
+				Component source = (Component) arg0.getSource();
+				JFileChooser fc = new JFileChooser();
+				fc.showOpenDialog(source);
+				String apk = fc.getSelectedFile().getAbsolutePath();
+				if (apk.contains(".apk"))
+					execAdbInstallCommand(apk);
+			}
+		});
+		
 		mnFile.add(mntmInstallapk);
+		deviceMenuItems.add(mntmInstallapk);
 		
-		JMenuItem mntmUninstallPackage = new JMenuItem("Uninstall Package...");
-		mntmUninstallPackage.setEnabled(false);
-		mntmUninstallPackage.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_U, InputEvent.META_MASK));
-		mnFile.add(mntmUninstallPackage);
-		
-		JMenuItem mntmExecuteShellCommand = new JMenuItem("Execute Shell Command...");
+		JMenuItem mntmExecuteShellCommand = new JMenuItem("Execute adb Command...");
 		mntmExecuteShellCommand.setEnabled(false);
-		mntmExecuteShellCommand.setMnemonic('x');
-		mntmExecuteShellCommand.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_X, Event.META_MASK));
+		mntmExecuteShellCommand.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_X, InputEvent.META_MASK));
+		mntmExecuteShellCommand.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent arg0) {
+				Component source = (Component) arg0.getSource();
+				String cmd = JOptionPane.showInputDialog(source,
+		                "enter adb command");
+				execAdbCommand(cmd);
+			}
+		});
 		mnFile.add(mntmExecuteShellCommand);
+		deviceMenuItems.add(mntmExecuteShellCommand);
 		
 		JMenuItem mntmGetDeviceProperties = new JMenuItem("Get Device Properties");
 		mntmGetDeviceProperties.setEnabled(false);
 		mntmGetDeviceProperties.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_P, InputEvent.META_MASK));
 		mnFile.add(mntmGetDeviceProperties);
-
+		deviceMenuItems.add(mntmGetDeviceProperties);
+		
 		mnFile.add(new JSeparator());
 		
 		JMenuItem mntmSaveScreenshot = new JMenuItem("Save Screenshot");
 		mntmSaveScreenshot.setEnabled(false);
-		mntmSaveScreenshot.setMnemonic('s');
 		mntmSaveScreenshot.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_S, Event.META_MASK));
 		mnFile.add(mntmSaveScreenshot);
+		deviceMenuItems.add(mntmSaveScreenshot);
 		
 		JMenuItem mntmSaveScreenshotAs = new JMenuItem("Save Screenshot As...");
 		mntmSaveScreenshotAs.setEnabled(false);
-		mntmSaveScreenshotAs.setMnemonic('a');
 		mntmSaveScreenshotAs.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_A, Event.META_MASK));
 		mnFile.add(mntmSaveScreenshotAs);
+		deviceMenuItems.add(mntmSaveScreenshotAs);
 		
 		JMenuItem mntmDisplayScreenshot = new JMenuItem("Display Screenshot...");
 		mntmDisplayScreenshot.setEnabled(false);
 		mntmDisplayScreenshot.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_D, InputEvent.META_MASK));
 		mnFile.add(mntmDisplayScreenshot);
+		deviceMenuItems.add(mntmDisplayScreenshot);
 	}
 	
 	public void initializeKeyCodeMap() {

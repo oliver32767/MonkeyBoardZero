@@ -46,6 +46,7 @@ public class DeviceListRenderer extends DefaultListCellRenderer {
 		Icon icon = null;
 		// Get icon to use for the list item value
 		if(value instanceof HashMap<?, ?>) {
+			@SuppressWarnings("unchecked")
 			HashMap<String, String> v = (HashMap<String, String>)value;
 			label.setText(v.get("deviceId"));
 			icon = icons.get(v.get("deviceStatus"));
