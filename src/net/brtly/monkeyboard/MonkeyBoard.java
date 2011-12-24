@@ -1,7 +1,6 @@
 package net.brtly.monkeyboard;
 
 import javax.swing.AbstractAction;
-import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JList;
 import javax.swing.JButton;
@@ -28,8 +27,6 @@ import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.io.Writer;
-import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -72,7 +69,7 @@ public class MonkeyBoard {
 	private JButton btnMonkeyBoard = null;
 	private JTextPane textConsole = null;
 	private ArrayList<JMenuItem> deviceMenuItems = new ArrayList<JMenuItem>(); //stores a reference to all menu items that need to be
-		//disabled when there isn't a device connected.
+																				//disabled when there isn't a device connected.
 	private Timer tmrRefresh = null;
 	
 	JFrame frmMonkeyboard;
@@ -81,15 +78,17 @@ public class MonkeyBoard {
     private IChimpDevice mDevice; 
     private String connectedDeviceId = null;
     private String desktopPath;
-    private static final String ANDROID_SDK = "/Users/obartley/Library/android-sdk-macosx/";
-    private static final String ADB = ANDROID_SDK + "platform-tools/adb";
-    private static final String EMULATOR = ANDROID_SDK + "tools/emulator";
+    
+	// TODO: remove absolute path to adb or make dynamic
+    private static final String ANDROID_SDK = "/Users/obartley/Library/android-sdk-macosx";
+    private static final String ADB = ANDROID_SDK + "/platform-tools/adb";
+    private static final String EMULATOR = ANDROID_SDK + "/tools/emulator";
+    //private static final String ADB = "adb";
+    //private static final String EMULATOR = "emulator";
     private static final long TIMEOUT = 5000;
     private static final int REFRESH_DELAY = 1000;
-    // ddms default filename = "device-2011-12-23-160423.png"
+    // ddms default filename == "device-2011-12-23-160423.png"
     public static final String TIMESTAMP_FORMAT = "yyyy-MM-dd-HHmmss";
-    
-    
     
     // lookup table to translate from Java keycodes to Android
     private Map<Integer, String> keyCodeMap = new TreeMap<Integer, String>();
@@ -151,7 +150,6 @@ public class MonkeyBoard {
 	private Map<String, String> getAdbStatus() {
 		Map<String, String> rv = new HashMap<String, String>();
 		// Capture output from `adb devices` and map connected deviceIds to their status
-		// TODO: remove absolute path to adb or make dynamic
 		String cmd = ADB + " devices";
 		Runtime run = Runtime.getRuntime();
 		Process pr = null;
@@ -171,14 +169,14 @@ public class MonkeyBoard {
 			while ((line=buf.readLine())!=null) {
 				if ( ! (line.startsWith("List") || line.length() <= 1) ) {
 					String[] s = line.split("\\s+"); //it's a tab separated list, dude!
-					rv.put(s[0], s[1]); // add deviceId, status to Map
+					rv.put(s[0], s[1]); // add deviceId as key, status as value to Map
 				}
 			}
 		} catch (IOException e) {
 			e.printStackTrace();
-		} 
+		}
 		return rv;
-	}	
+	}
 
 	/**
 	 * execute an adb command via
@@ -222,6 +220,7 @@ public class MonkeyBoard {
 		};
 		worker.execute();
 	}
+	
 	/**
 	 * the only reason this one is used exclusively for install is because
 	 * the default process runner used in execAdbCommand treats whitespace as delimiting arguments, regardless of
@@ -294,7 +293,6 @@ public class MonkeyBoard {
 		// now run the thread
 		worker.execute();
 	}
-	
 	
 	/**
 	 * refreshes data in listModel to reflect the current status of devices connected to adb
@@ -388,19 +386,19 @@ public class MonkeyBoard {
 				refreshDeviceList();
 				return null;
 			}
-	
+			toConsole("connecting to device: " + deviceId);
 			//get a connection to the device
 			try {
 		        mDevice = mChimpChat.waitForConnection(TIMEOUT, deviceId);
 		        if ( mDevice == null ) throw new RuntimeException("Couldn't connect.");
 		        mDevice.wake();
 		        connectedDeviceId = deviceId;
-		        toConsole("connected to device: " + deviceId);
+		        toConsole("connected.");
 		        setDeviceMenuItemsEnabled(true);
 			} catch (Exception e) {
 				e.printStackTrace();
 				disconnectFromDevice();
-	        	toConsole("couldn't connect to device: " + deviceId);    
+	        	toConsole("failed to connect.");    
 			}
 			refreshDeviceList();
 		  	return null;
@@ -435,7 +433,7 @@ public class MonkeyBoard {
 	}
 	
 	/**
-	 * 
+	 * display a list of device properties in the console
 	 */
 	private void getDeviceProperties() {
 		String[] props = {"build.board",
@@ -460,6 +458,7 @@ public class MonkeyBoard {
 		toConsole("Device properties for " + connectedDeviceId);
 		try {
 			for (int i = 0; i < props.length; i++ ) {
+				// pad property name with spaces to create a pretty table
 				toConsole(String.format("%1$-" + 30 + "s", props[i]) + mDevice.getProperty(props[i]));
 			}
 		} catch (Exception e) {
