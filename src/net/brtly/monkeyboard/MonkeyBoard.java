@@ -18,6 +18,7 @@ import javax.swing.Timer;
 
 import com.android.chimpchat.ChimpChat;
 import com.android.chimpchat.core.IChimpDevice;
+import com.android.chimpchat.core.IChimpImage;
 import com.android.chimpchat.core.TouchPressType;
 
 import java.awt.event.MouseAdapter;
@@ -25,7 +26,10 @@ import java.awt.event.MouseEvent;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.sql.Timestamp;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -73,13 +77,17 @@ public class MonkeyBoard {
     private ChimpChat mChimpChat;
     private IChimpDevice mDevice; 
     private String connectedDeviceId = null;
-    
+    private String desktopPath;
     private static final String ANDROID_SDK = "/Users/obartley/Library/android-sdk-macosx/";
     private static final String ADB = ANDROID_SDK + "platform-tools/adb";
     private static final String EMULATOR = ANDROID_SDK + "tools/emulator";
     private static final long TIMEOUT = 5000;
     private static final int REFRESH_DELAY = 1000;
-	    
+    // ddms default filename = "device-2011-12-23-160423.png"
+    public static final String TIMESTAMP_FORMAT = "yyyy-MM-dd-HHmmss";
+    
+    
+    
     // lookup table to translate from Java keycodes to Android
     private Map<Integer, String> keyCodeMap = new TreeMap<Integer, String>();
     
@@ -101,9 +109,10 @@ public class MonkeyBoard {
         options.put("backend", "adb");
         options.put("adbLocation", ADB);
 		mChimpChat = ChimpChat.getInstance(options);
-		@SuppressWarnings("serial")
+		desktopPath = System.getProperty("user.home") + "/Desktop";
 		
 		// create the timer that refreshes the device list
+		@SuppressWarnings("serial")
 		AbstractAction timerAction = new AbstractAction() {
 		    public void actionPerformed(ActionEvent e) {
 		    	refreshDeviceList();
@@ -454,6 +463,31 @@ public class MonkeyBoard {
 			e.printStackTrace();
 		}
 	}
+	
+	/**
+	 * Handler for all screenshot functions. If a filename is passed, a screenshot will be saved there
+	 * if "" or null is passed, the na default filename will be generated and the file will be saved to the user's desktop
+	 * @param filename
+	 */
+	private void screenshotHandler(String filename) {
+		// if there was no filename passed, give it a default and save to desktop
+		if ((filename == "") || (filename == null)) {
+			// ddms default filename = "device-2011-12-23-160423.png"
+			Calendar cal = Calendar.getInstance();
+		    SimpleDateFormat sdf = new SimpleDateFormat(TIMESTAMP_FORMAT);
+		    filename = desktopPath + "/device-" + sdf.format(cal.getTime() + ".png");	    			
+		}
+		// now do the saving...
+		try {
+			toConsole("Saving snapshot to " + filename);
+			IChimpImage img = mDevice.takeSnapshot();
+			img.writeToFile(filename, "png");
+		} catch (Exception e) {
+			toConsole("there was an error saving " + filename);
+			e.printStackTrace();
+		}
+	}
+	
 	
 	/**
 	 * Handles keyPress and keyRelease events to be sent to connected device
@@ -818,18 +852,25 @@ public class MonkeyBoard {
 		mnFile.add(new JSeparator());
 		
 		JMenuItem mntmSaveScreenshot = new JMenuItem("Save Screenshot");
+		mntmSaveScreenshot.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				screenshotHandler(null);
+			}
+		});
 		mntmSaveScreenshot.setEnabled(false);
 		mntmSaveScreenshot.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_S, Event.META_MASK));
 		mnFile.add(mntmSaveScreenshot);
 		deviceMenuItems.add(mntmSaveScreenshot);
 		
 		JMenuItem mntmSaveScreenshotAs = new JMenuItem("Save Screenshot As...");
+		mntmSaveScreenshotAs.setVisible(false);
 		mntmSaveScreenshotAs.setEnabled(false);
 		mntmSaveScreenshotAs.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_A, Event.META_MASK));
 		mnFile.add(mntmSaveScreenshotAs);
 		deviceMenuItems.add(mntmSaveScreenshotAs);
 		
 		JMenuItem mntmDisplayScreenshot = new JMenuItem("Display Screenshot...");
+		mntmDisplayScreenshot.setVisible(false);
 		mntmDisplayScreenshot.setEnabled(false);
 		mntmDisplayScreenshot.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_D, InputEvent.META_MASK));
 		mnFile.add(mntmDisplayScreenshot);
