@@ -24,8 +24,11 @@ import com.android.chimpchat.core.TouchPressType;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.Writer;
 import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -488,6 +491,65 @@ public class MonkeyBoard {
 		}
 	}
 	
+	/**
+	 * dumps logcat of the connected device to the filename specified
+	 * if no filename is specified, dumps file to user's desktop
+	 * @param filename
+	 */
+	private void logcatHandler(String filename) {
+		// I don't think this one needs to be threaded
+		FileWriter fWriter = null;
+		BufferedWriter writer = null; 
+		Runtime rt = Runtime.getRuntime();
+		String s;
+		
+		// if there was no filename passed, give it a default and save to desktop
+		if ((filename == "") || (filename == null)) {
+			// ddms default filename = "device-2011-12-23-160423.png"
+			Calendar cal = Calendar.getInstance();
+		    SimpleDateFormat sdf = new SimpleDateFormat(TIMESTAMP_FORMAT);
+		    filename = desktopPath + "/device-" + sdf.format(cal.getTime()) + ".log";	    			
+		}
+		
+		// use an array anytime we handle filenames
+		String[] cmd = {ADB, "-s", connectedDeviceId, "logcat", "-d"};
+
+		toConsole(">>> " + ADB + " -s " + connectedDeviceId + " logcat -d > " + '"' + filename + '"');
+		
+		try {
+			// initialize file objects
+			fWriter = new FileWriter(filename);
+			writer = new BufferedWriter(fWriter);
+			
+			// execute the command
+			Process proc = rt.exec(cmd);
+
+			// get output streams
+			BufferedReader stdInput = new BufferedReader(new 
+	             InputStreamReader(proc.getInputStream()));
+
+	        BufferedReader stdError = new BufferedReader(new 
+	             InputStreamReader(proc.getErrorStream()));
+
+	        // read the output from the output streams
+	        while ((s = stdInput.readLine()) != null) {
+	        	// write the line to file
+	            writer.write(s);
+	  		  	writer.newLine();
+	        }
+	        
+	        // close file stream
+	        writer.close();
+	        
+	        // read any errors from the attempted command
+	        //System.out.println("Here is the standard error of the command (if any):\n");
+	        while ((s = stdError.readLine()) != null) {
+	            System.out.println(s);
+	        }
+		}catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
 	
 	/**
 	 * Handles keyPress and keyRelease events to be sent to connected device
@@ -767,16 +829,6 @@ public class MonkeyBoard {
 		mntmRestartAdbServer.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_R, InputEvent.META_MASK));
 		mnFile.add(mntmRestartAdbServer);		
 		
-		JMenuItem mntmRefreshDeviceList = new JMenuItem("Refresh Device List");
-		mntmRefreshDeviceList.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_L, InputEvent.META_MASK));
-		mntmRefreshDeviceList.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent arg0) {
-			toConsole("refreshing device list...");
-			refreshDeviceList();
-			}
-		});
-		mnFile.add(mntmRefreshDeviceList);
-				
 		JMenuItem mntmConnectToDevice = new JMenuItem("Connect To Device");
 		mntmConnectToDevice.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent arg0) {
@@ -864,6 +916,18 @@ public class MonkeyBoard {
 		
 		JMenuItem mntmSaveScreenshotAs = new JMenuItem("Save Screenshot As...");
 		mntmSaveScreenshotAs.setVisible(false);
+		
+		JMenuItem mntmSaveLogcat = new JMenuItem("Save Logcat");
+		mntmSaveLogcat.setEnabled(false);
+		mntmSaveLogcat.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_L, InputEvent.META_MASK));
+		mntmSaveLogcat.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent arg0) {
+				logcatHandler("");
+			}
+		});
+		deviceMenuItems.add(mntmSaveLogcat);
+		
+		mnFile.add(mntmSaveLogcat);
 		mntmSaveScreenshotAs.setEnabled(false);
 		mntmSaveScreenshotAs.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_A, Event.META_MASK));
 		mnFile.add(mntmSaveScreenshotAs);
