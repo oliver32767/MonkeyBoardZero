@@ -475,7 +475,7 @@ public class MonkeyBoard {
 			// ddms default filename = "device-2011-12-23-160423.png"
 			Calendar cal = Calendar.getInstance();
 		    SimpleDateFormat sdf = new SimpleDateFormat(TIMESTAMP_FORMAT);
-		    filename = desktopPath + "/device-" + sdf.format(cal.getTime() + ".png");	    			
+		    filename = desktopPath + "/device-" + sdf.format(cal.getTime()) + ".png";	    			
 		}
 		// now do the saving...
 		try {
