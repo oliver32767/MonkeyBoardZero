@@ -1,6 +1,7 @@
 package net.brtly.monkeyboard;
 
 import javax.swing.AbstractAction;
+import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JList;
 import javax.swing.JButton;
@@ -24,6 +25,7 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
+import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -35,6 +37,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Scanner;
 import java.util.Set;
 import java.util.TreeMap;
 import java.awt.event.FocusAdapter;
@@ -81,11 +84,10 @@ public class MonkeyBoard {
     private String desktopPath;
     
 	// TODO: remove absolute path to adb or make dynamic
-    private static final String ANDROID_SDK = "/Users/obartley/Library/android-sdk-macosx";
-    private static final String ADB = ANDROID_SDK + "/platform-tools/adb";
-    private static final String EMULATOR = ANDROID_SDK + "/tools/emulator";
-    //private static final String ADB = "adb";
-    //private static final String EMULATOR = "emulator";
+    private static String ANDROID_SDK = null;
+    private static String ADB = null;
+    private static String EMULATOR = null;
+    
     private static final long TIMEOUT = 5000;
     private static final int REFRESH_DELAY = 1000;
     // ddms default filename == "device-2011-12-23-160423.png"
@@ -102,17 +104,24 @@ public class MonkeyBoard {
 	 * Create the application.
 	 */
 	public MonkeyBoard() {
-		// warmup!
-		initialize(); // this method is only for GUI elements manipulated on Design tab
-		initializeKeyCodeMap();
-		refreshDeviceList();
+		// init UI
+		initialize(); // this method is only for GUI elements manipulated on the Eclipse windowBuilder Design tab
+		initializeKeyCodeMap(); //static map used to translate Java keycodes to Android
 		
+		// initialize sdk path variables
+	    initSdkPath();
+	    
 		// create the adb backend
 		TreeMap<String, String> options = new TreeMap<String, String>();
         options.put("backend", "adb");
         options.put("adbLocation", ADB);
 		mChimpChat = ChimpChat.getInstance(options);
 		desktopPath = System.getProperty("user.home") + "/Desktop";
+
+
+		
+	    	
+		refreshDeviceList();
 		
 		// create the timer that refreshes the device list
 		@SuppressWarnings("serial")
@@ -140,7 +149,69 @@ public class MonkeyBoard {
 			}
 		});
 	}
-
+	
+	/**
+	 * initialize android sdk, adb and emulator path variables
+	 * this method expects ANDROID_SDK, ADB and EMULATOR to be initialized to null at the class level
+	 */
+	private void initSdkPath() {
+		File confFile = null;
+		String confPath = System.getenv("HOME") + "/.monkeyboard";
+		try {
+			// try loading from config file
+			confFile = new File(confPath);
+			Scanner confScanner = new Scanner(confFile);
+			// Scanner is a simple iterator
+			ANDROID_SDK = confScanner.nextLine(); // THIS ASSUMES THERE IS ONLY ONE LINE CONTAINING THE SDK PATH!
+		} catch (Exception e) {
+			// show a dialog and directory chooser
+			JOptionPane.showMessageDialog(this.frmMonkeyboard,	    	
+				    "Cannot locate Android SDK. Select the root of your SDK installation.",
+				    "MonkeyBoard",
+				    JOptionPane.WARNING_MESSAGE);
+			
+			JFileChooser fileChooser = new JFileChooser();
+			// TODO: make this use FileDialog if on OS X?
+			fileChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+			fileChooser.setDialogTitle("Choose Android SDK location");
+			fileChooser.showOpenDialog(null);
+			ANDROID_SDK = fileChooser.getSelectedFile().toString();
+		}
+			
+		// set us up the bomb, set up the executable paths
+		if (ANDROID_SDK.endsWith("/")) // then strip trailing slash
+    		ANDROID_SDK = ANDROID_SDK.substring(0, ANDROID_SDK.length() - 1);
+    	ADB = ANDROID_SDK + "/platform-tools/adb";
+    	EMULATOR = ANDROID_SDK + "/tools/emulator";
+    	
+    	// check and see if the path is correct,
+    	// make sure we can find adb
+    	File adbBin = new File(ADB);
+    	if ( ! adbBin.exists() ) {
+    		// can't find!
+			// show a dialog
+			JOptionPane.showMessageDialog(this.frmMonkeyboard,	    	
+				    "Cannot locate Android SDK. Please try again!",
+				    "GAME OVER",
+				    JOptionPane.ERROR_MESSAGE);
+			// delete the config file to force a new path selection next launch
+			confFile.delete();
+			System.exit(1);
+    	} else {
+    		// save the SDK path for next time
+    		try {
+            	BufferedWriter out = new BufferedWriter(new FileWriter(confPath));
+    	    	out.write(ANDROID_SDK);
+    			out.close();
+    		} catch (IOException e) {
+    			// TODO Auto-generated catch block
+    			e.printStackTrace();
+    		}
+    	}
+    			   
+    	// let it be known!
+    	toConsole("Using Android SDK: " + ANDROID_SDK);
+	}
 	
 	/**
 	 *  Append a String to the text in the console and force scrolling to the end of the doc
@@ -166,11 +237,14 @@ public class MonkeyBoard {
 	 * @return
 	 */
 	private Map<String, String> getAdbStatus() {
-		Map<String, String> rv = new HashMap<String, String>();
-		// Capture output from `adb devices` and map connected deviceIds to their status
+		// check that the sdk path is set
+		// don't nag, because this is run on a timer
+		if (ANDROID_SDK == null) return new HashMap<String, String>();
+		
 		String cmd = ADB + " devices";
 		Runtime run = Runtime.getRuntime();
 		Process pr = null;
+		Map<String, String> rv = new HashMap<String, String>();
 		
 		// execute cmd
 		try {
@@ -288,6 +362,12 @@ public class MonkeyBoard {
 	 * @param name
 	 */
 	private void startAvd(final String name) {
+		// check that the sdk path is set
+		if (ANDROID_SDK == null) {
+			toConsole("Cannot locate Android SDK!");
+			return;
+		}
+
 		SwingWorker <Object, Void> worker = new SwingWorker<Object, Void>() {
 		    @Override
 		    public Object doInBackground() {
@@ -827,7 +907,7 @@ public class MonkeyBoard {
 		);
 		
 		textConsole = new JTextPane();
-		textConsole.setText("ready");
+		//textConsole.setText("ready");
 		textConsole.setForeground(new Color(255, 255, 255));
 		textConsole.setFont(new Font("Monospaced", Font.PLAIN, 15));
 		textConsole.setEditable(false);

@@ -5,7 +5,7 @@
     <target name="create_run_jar">
         <jar destfile="/Users/obartley/Projects/MonkeyBoard/bin/MonkeyBoard.jar" filesetmanifest="mergewithoutmain">
             <manifest>
-                <attribute name="Main-Class" value="net.brtly.monkeyboard.MonkeyBoardLauncher"/>
+                <attribute name="Main-Class" value="net.brtly.monkeyboard.MonkeyBoard"/>
                 <attribute name="Class-Path" value="."/>
             </manifest>
             <fileset dir="/Users/obartley/Projects/MonkeyBoard/bin"/>
