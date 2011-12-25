@@ -66,6 +66,7 @@ import java.awt.Font;
 import javax.swing.JScrollPane;
 import java.awt.event.InputEvent;
 import java.awt.Color;
+import java.awt.SystemColor;
 
 public class MonkeyBoard {
 	private DefaultListModel listModel = new DefaultListModel();
@@ -835,7 +836,6 @@ public class MonkeyBoard {
 		btnMonkeyBoard.setHorizontalTextPosition(SwingConstants.CENTER);
 		btnMonkeyBoard.setFocusTraversalKeysEnabled(false);
 		btnMonkeyBoard.setAlignmentX(Component.CENTER_ALIGNMENT);
-		btnMonkeyBoard.setBorderPainted(false);
 		btnMonkeyBoard.setIconTextGap(0);
 		btnMonkeyBoard.setPressedIcon(new ImageIcon(MonkeyBoard.class.getResource("/res/android_large_sel.png")));
 		btnMonkeyBoard.setSelectedIcon(new ImageIcon(MonkeyBoard.class.getResource("/res/android_large_sel.png")));
@@ -844,6 +844,7 @@ public class MonkeyBoard {
 			@Override
 			public void keyPressed(KeyEvent e) {
 				keyEventHandler(e.getKeyCode(), e.getModifiers(), TouchPressType.DOWN);
+				//btnMonkeyBoard.
 			}
 			@Override
 			public void keyReleased(KeyEvent e) {
