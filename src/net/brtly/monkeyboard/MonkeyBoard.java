@@ -836,8 +836,8 @@ public class MonkeyBoard {
 		btnMonkeyBoard.setFocusTraversalKeysEnabled(false);
 		btnMonkeyBoard.setAlignmentX(Component.CENTER_ALIGNMENT);
 		btnMonkeyBoard.setIconTextGap(0);
-		btnMonkeyBoard.setPressedIcon(new ImageIcon(MonkeyBoard.class.getResource("/res/android_large_sel.png")));
-		btnMonkeyBoard.setSelectedIcon(new ImageIcon(MonkeyBoard.class.getResource("/res/android_large_sel.png")));
+		btnMonkeyBoard.setPressedIcon(null);
+		btnMonkeyBoard.setSelectedIcon(new ImageIcon(MonkeyBoard.class.getResource("/res/keyboard_on.png")));
 		btnMonkeyBoard.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 		btnMonkeyBoard.addKeyListener(new KeyAdapter() {
 			@Override
@@ -864,7 +864,7 @@ public class MonkeyBoard {
 			}
 		});	
 		btnMonkeyBoard.setBorder(null);
-		btnMonkeyBoard.setIcon(new ImageIcon(MonkeyBoard.class.getResource("/res/android_large.png")));
+		btnMonkeyBoard.setIcon(new ImageIcon(MonkeyBoard.class.getResource("/res/keyboard.png")));
 		
 		JScrollPane consoleScrollPane = new JScrollPane();
 
