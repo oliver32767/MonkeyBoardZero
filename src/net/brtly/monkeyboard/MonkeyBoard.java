@@ -67,6 +67,7 @@ import javax.swing.JScrollPane;
 import java.awt.event.InputEvent;
 import java.awt.Color;
 import java.awt.Toolkit;
+import javax.swing.JCheckBoxMenuItem;
 
 public class MonkeyBoard {
 	private DefaultListModel listModel = new DefaultListModel();
@@ -75,6 +76,8 @@ public class MonkeyBoard {
 	private JTextPane textConsole = null;
 	private ArrayList<JMenuItem> deviceMenuItems = new ArrayList<JMenuItem>(); //stores a reference to all menu items that need to be
 																				//disabled when there isn't a device connected.
+	private JCheckBoxMenuItem chckbxmntmShowKeyEvents = null; // option menu
+	
 	private Timer tmrRefresh = null;
 	
 	JFrame frmMonkeyboard;
@@ -152,6 +155,22 @@ public class MonkeyBoard {
 	}
 	
 	/**
+	 * wrapper function to allow resetting of the SDK path from the GUI menu
+	 * works by deleting the config file and calling the initSdkPath usually only run at launch
+	 */
+	private void resetSdkPath() {
+		try {
+			File confFile = null;
+			String confPath = System.getenv("HOME") + "/.monkeyboard";
+			confFile = new File(confPath);
+			confFile.delete();
+		} catch (Exception e) {
+			toConsole("there was an error removing ~/.monkeyboard");
+		}
+		initSdkPath();
+	}
+	
+	/**
 	 * initialize android sdk, adb and emulator path variables
 	 * this method expects ANDROID_SDK, ADB and EMULATOR to be initialized to null at the class level
 	 */
@@ -167,16 +186,28 @@ public class MonkeyBoard {
 		} catch (Exception e) {
 			// show a dialog and directory chooser
 			JOptionPane.showMessageDialog(this.frmMonkeyboard,	    	
-				    "Cannot locate Android SDK. Select the root of your SDK installation.",
-				    "MonkeyBoard",
-				    JOptionPane.WARNING_MESSAGE);
+				    "Select the root directory of your SDK installation.",
+				    "MonkeyBoard Setup",
+				    JOptionPane.INFORMATION_MESSAGE);
 			
 			JFileChooser fileChooser = new JFileChooser();
 			// TODO: make this use FileDialog if on OS X?
 			fileChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
 			fileChooser.setDialogTitle("Choose Android SDK location");
 			fileChooser.showOpenDialog(null);
-			ANDROID_SDK = fileChooser.getSelectedFile().toString();
+			try {
+				ANDROID_SDK = fileChooser.getSelectedFile().toString();
+			} catch ( NullPointerException npe) {
+	    		// can't find!
+				// show a dialog
+				JOptionPane.showMessageDialog(this.frmMonkeyboard,	    	
+					    "Cannot locate Android SDK. Please try again!",
+					    "GAME OVER",
+					    JOptionPane.ERROR_MESSAGE);
+				// delete the config file to force a new path selection next launch
+				confFile.delete();
+				System.exit(1);
+			}
 		}
 			
 		// set us up the bomb, set up the executable paths
@@ -219,6 +250,12 @@ public class MonkeyBoard {
 	 *  basically a Log
 	 */
 	public void toConsole(String arg0) {
+
+		if ( arg0.contains("KEYCODE") && ( !chckbxmntmShowKeyEvents.isSelected())) {
+			// exit if it's a keycode event and the option is unchecked
+			return;
+		}
+		
 		try {
 			// get document from console and append arg0
 			Document d = textConsole.getDocument();
@@ -1046,6 +1083,22 @@ public class MonkeyBoard {
 		mntmDisplayScreenshot.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_D, InputEvent.META_MASK));
 		mnFile.add(mntmDisplayScreenshot);
 		deviceMenuItems.add(mntmDisplayScreenshot);
+		
+		JMenu mnOptions = new JMenu("Options");
+		menuBar.add(mnOptions);
+		
+		// class level declaration
+		chckbxmntmShowKeyEvents = new JCheckBoxMenuItem("Show Key Events in Console");
+		chckbxmntmShowKeyEvents.setSelected(true);
+		mnOptions.add(chckbxmntmShowKeyEvents);
+		
+		JMenuItem mntmConfigureAndroidSdk = new JMenuItem("Configure Android SDK path...");
+		mntmConfigureAndroidSdk.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent arg0) {
+			resetSdkPath();
+			}
+		});
+		mnOptions.add(mntmConfigureAndroidSdk);
 	}
 	
 	public void initializeKeyCodeMap() {
