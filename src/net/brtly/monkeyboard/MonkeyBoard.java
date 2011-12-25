@@ -87,10 +87,12 @@ public class MonkeyBoard {
     private String connectedDeviceId = null;
     private String desktopPath;
     
-	// TODO: remove absolute path to adb or make dynamic
-    private static String ANDROID_SDK = null;
-    private static String ADB = null;
-    private static String EMULATOR = null;
+	
+    private static String androidSdkPath = null;
+    private static String androidSdkAdbPath = null;
+    private static String androidSdkEmulatorPath = null;
+    
+    
     
     private static final long TIMEOUT = 5000;
     private static final int REFRESH_DELAY = 1000;
@@ -118,7 +120,7 @@ public class MonkeyBoard {
 		// create the adb backend
 		TreeMap<String, String> options = new TreeMap<String, String>();
         options.put("backend", "adb");
-        options.put("adbLocation", ADB);
+        options.put("adbLocation", androidSdkAdbPath);
 		mChimpChat = ChimpChat.getInstance(options);
 		desktopPath = System.getProperty("user.home") + "/Desktop";
 
@@ -172,7 +174,7 @@ public class MonkeyBoard {
 	
 	/**
 	 * initialize android sdk, adb and emulator path variables
-	 * this method expects ANDROID_SDK, ADB and EMULATOR to be initialized to null at the class level
+	 * this method expects androidSdkPath, androidSdkAdbPath and androidSdkEmulatorPath to be initialized to null at the class level
 	 */
 	private void initSdkPath() {
 		File confFile = null;
@@ -182,7 +184,7 @@ public class MonkeyBoard {
 			confFile = new File(confPath);
 			Scanner confScanner = new Scanner(confFile);
 			// Scanner is a simple iterator
-			ANDROID_SDK = confScanner.nextLine(); // THIS ASSUMES THERE IS ONLY ONE LINE CONTAINING THE SDK PATH!
+			androidSdkPath = confScanner.nextLine(); // THIS ASSUMES THERE IS ONLY ONE LINE CONTAINING THE SDK PATH!
 		} catch (Exception e) {
 			// show a dialog and directory chooser
 			JOptionPane.showMessageDialog(this.frmMonkeyboard,	    	
@@ -196,7 +198,7 @@ public class MonkeyBoard {
 			fileChooser.setDialogTitle("Choose Android SDK location");
 			fileChooser.showOpenDialog(null);
 			try {
-				ANDROID_SDK = fileChooser.getSelectedFile().toString();
+				androidSdkPath = fileChooser.getSelectedFile().toString();
 			} catch ( NullPointerException npe) {
 	    		// can't find!
 				// show a dialog
@@ -211,14 +213,14 @@ public class MonkeyBoard {
 		}
 			
 		// set us up the bomb, set up the executable paths
-		if (ANDROID_SDK.endsWith("/")) // then strip trailing slash
-    		ANDROID_SDK = ANDROID_SDK.substring(0, ANDROID_SDK.length() - 1);
-    	ADB = ANDROID_SDK + "/platform-tools/adb";
-    	EMULATOR = ANDROID_SDK + "/tools/emulator";
+		if (androidSdkPath.endsWith("/")) // then strip trailing slash
+    		androidSdkPath = androidSdkPath.substring(0, androidSdkPath.length() - 1);
+    	androidSdkAdbPath = androidSdkPath + "/platform-tools/adb";
+    	androidSdkEmulatorPath = androidSdkPath + "/tools/emulator";
     	
     	// check and see if the path is correct,
     	// make sure we can find adb
-    	File adbBin = new File(ADB);
+    	File adbBin = new File(androidSdkAdbPath);
     	if ( ! adbBin.exists() ) {
     		// can't find!
 			// show a dialog
@@ -233,7 +235,7 @@ public class MonkeyBoard {
     		// save the SDK path for next time
     		try {
             	BufferedWriter out = new BufferedWriter(new FileWriter(confPath));
-    	    	out.write(ANDROID_SDK);
+    	    	out.write(androidSdkPath);
     			out.close();
     		} catch (IOException e) {
     			// TODO Auto-generated catch block
@@ -242,7 +244,7 @@ public class MonkeyBoard {
     	}
     			   
     	// let it be known!
-    	toConsole("Using Android SDK: " + ANDROID_SDK);
+    	toConsole("Using Android SDK: " + androidSdkPath);
 	}
 	
 	/**
@@ -277,9 +279,9 @@ public class MonkeyBoard {
 	private Map<String, String> getAdbStatus() {
 		// check that the sdk path is set
 		// don't nag, because this is run on a timer
-		if (ANDROID_SDK == null) return new HashMap<String, String>();
+		if (androidSdkPath == null) return new HashMap<String, String>();
 		
-		String cmd = ADB + " devices";
+		String cmd = androidSdkAdbPath + " devices";
 		Runtime run = Runtime.getRuntime();
 		Process pr = null;
 		Map<String, String> rv = new HashMap<String, String>();
@@ -324,7 +326,7 @@ public class MonkeyBoard {
 				if (args == null) return null;
 				if (connectedDeviceId == null) return null;
 				
-				String cmd = ADB + " -s " + connectedDeviceId + " " + args;
+				String cmd = androidSdkAdbPath + " -s " + connectedDeviceId + " " + args;
 				toConsole(">>> " + cmd);
 				
 				// execute cmd
@@ -367,9 +369,9 @@ public class MonkeyBoard {
 				if (apkPath == null) return null;
 				if (connectedDeviceId == null) return null;
 				
-				String[] cmd = {ADB, "-s", connectedDeviceId, "install", apkPath};
+				String[] cmd = {androidSdkAdbPath, "-s", connectedDeviceId, "install", apkPath};
 		
-				toConsole(">>> " + ADB + " -s " + connectedDeviceId + " install " + '"' + apkPath + '"');
+				toConsole(">>> " + androidSdkAdbPath + " -s " + connectedDeviceId + " install " + '"' + apkPath + '"');
 				
 				// execute cmd
 				try {
@@ -401,7 +403,7 @@ public class MonkeyBoard {
 	 */
 	private void startAvd(final String name) {
 		// check that the sdk path is set
-		if (ANDROID_SDK == null) {
+		if (androidSdkPath == null) {
 			toConsole("Cannot locate Android SDK!");
 			return;
 		}
@@ -412,7 +414,7 @@ public class MonkeyBoard {
 				Runtime run = Runtime.getRuntime();
 				Process pr = null;
 				
-				String cmd = EMULATOR + " -avd " + name;
+				String cmd = androidSdkEmulatorPath + " -avd " + name;
 
 				toConsole(">>> " + cmd);
 				
@@ -647,9 +649,9 @@ public class MonkeyBoard {
 		}
 		
 		// use an array anytime we handle filenames
-		String[] cmd = {ADB, "-s", connectedDeviceId, "logcat", "-d"};
+		String[] cmd = {androidSdkAdbPath, "-s", connectedDeviceId, "logcat", "-d"};
 
-		toConsole(">>> " + ADB + " -s " + connectedDeviceId + " logcat -d > " + '"' + filename + '"');
+		toConsole(">>> " + androidSdkAdbPath + " -s " + connectedDeviceId + " logcat -d > " + '"' + filename + '"');
 		
 		try {
 			// initialize file objects
