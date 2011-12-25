@@ -92,7 +92,14 @@ public class MonkeyBoard {
     private static String androidSdkAdbPath = null;
     private static String androidSdkEmulatorPath = null;
     
-    
+    private static String MOTD = "This software is provided " + '"' + "AS IS" + '"' + " and any expressed or implied warranties,\n" +
+    		"including, but not limited to, the implied warranties of merchantability\n" +
+    		"and fitness for a particular purpose are disclaimed. Have a nice day.\n" +
+    		"MonkeyBoard © 2011 Oliver Bartley";
+    		
+    		//THIS SOFTWARE IS PROVIDED "AS IS" AND ANY EXPRESSED OR IMPLIED WARRANTIES, 
+    		// INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY 
+    		// AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
     
     private static final long TIMEOUT = 5000;
     private static final int REFRESH_DELAY = 1000;
@@ -406,8 +413,10 @@ public class MonkeyBoard {
 		if (androidSdkPath == null) {
 			toConsole("Cannot locate Android SDK!");
 			return;
+		} else if (name == null) {
+			return;
 		}
-
+		
 		SwingWorker <Object, Void> worker = new SwingWorker<Object, Void>() {
 		    @Override
 		    public Object doInBackground() {
@@ -697,7 +706,7 @@ public class MonkeyBoard {
 	 */
 	private void keyEventHandler(int keyCode, int modifiers, TouchPressType type) {
 		String code = null;
-		String stype = (type == TouchPressType.DOWN)?"PRESS":"RELEASE";
+		String stype = (type == TouchPressType.DOWN)?"DOWN":"UP";
 		//Boolean isShift = ((modifiers & 0x01) == 1);
 		Boolean isCtrl = ((modifiers & 0x02) == 2);
 		Boolean isMeta = ((modifiers & 0x04) == 4);
@@ -811,7 +820,7 @@ public class MonkeyBoard {
 		String code;
 	    while (iter.hasNext()) {
 	    	code = iter.next();
-	    	toConsole("[-:-] " + code + " RELEASE");
+	    	toConsole("[-:-] " + code + " UP");
 			if (connectedDeviceId != null) {
 				mDevice.press(code, TouchPressType.UP);
 			} 
@@ -954,9 +963,9 @@ public class MonkeyBoard {
 		);
 		
 		textConsole = new JTextPane();
-		textConsole.setText(">>> MonkeyBoard");
+		textConsole.setText(MOTD);
 		//textConsole.setText("ready");
-		textConsole.setForeground(new Color(255, 255, 255));
+		textConsole.setForeground(new Color(166, 199, 58)); //android green
 		textConsole.setFont(new Font("Monospaced", Font.PLAIN, 15));
 		textConsole.setEditable(false);
 		textConsole.setBackground(new Color(0, 0, 0));
