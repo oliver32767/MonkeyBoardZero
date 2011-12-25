@@ -47,6 +47,7 @@ import javax.swing.text.SimpleAttributeSet;
 
 import java.awt.Cursor;
 import java.awt.Event;
+import java.awt.EventQueue;
 import java.awt.FileDialog;
 import java.awt.Rectangle;
 import java.awt.event.KeyAdapter;
@@ -123,6 +124,23 @@ public class MonkeyBoard {
 		tmrRefresh = new Timer(REFRESH_DELAY, timerAction);
 		tmrRefresh.start();
 	}
+	
+	/**
+	 * Launch the application.
+	 */
+	public static void main(String[] args) {
+		EventQueue.invokeLater(new Runnable() {
+			public void run() {
+				try {
+					MonkeyBoard window = new MonkeyBoard();
+					window.frmMonkeyboard.setVisible(true);
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
+			}
+		});
+	}
+
 	
 	/**
 	 *  Append a String to the text in the console and force scrolling to the end of the doc
