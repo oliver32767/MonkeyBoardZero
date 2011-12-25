@@ -907,6 +907,7 @@ public class MonkeyBoard {
 		);
 		
 		textConsole = new JTextPane();
+		textConsole.setText(">>> MonkeyBoard");
 		//textConsole.setText("ready");
 		textConsole.setForeground(new Color(255, 255, 255));
 		textConsole.setFont(new Font("Monospaced", Font.PLAIN, 15));
