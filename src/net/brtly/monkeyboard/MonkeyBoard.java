@@ -66,6 +66,7 @@ import java.awt.Font;
 import javax.swing.JScrollPane;
 import java.awt.event.InputEvent;
 import java.awt.Color;
+import java.awt.Toolkit;
 
 public class MonkeyBoard {
 	private DefaultListModel listModel = new DefaultListModel();
@@ -859,8 +860,15 @@ public class MonkeyBoard {
 			}
 			@Override
 			public void focusGained(FocusEvent arg0) {
-				toConsole("key events trapped");
-				btnMonkeyBoard.setSelected(true);
+				if (connectedDeviceId == null) {
+					// give focus to the console, don't trap input
+					toConsole("no connected device");
+					textConsole.requestFocus();
+				} else {
+					// begin trapping key events
+					toConsole("key events trapped");
+					btnMonkeyBoard.setSelected(true);
+				}
 			}
 		});	
 		btnMonkeyBoard.setBorder(null);
