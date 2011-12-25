@@ -66,7 +66,6 @@ import java.awt.Font;
 import javax.swing.JScrollPane;
 import java.awt.event.InputEvent;
 import java.awt.Color;
-import java.awt.SystemColor;
 
 public class MonkeyBoard {
 	private DefaultListModel listModel = new DefaultListModel();
@@ -662,11 +661,7 @@ public class MonkeyBoard {
 		//Boolean isShift = ((modifiers & 0x01) == 1);
 		Boolean isCtrl = ((modifiers & 0x02) == 2);
 		Boolean isMeta = ((modifiers & 0x04) == 4);
-		//Boolean isAlt = ((modifiers & 0x08) == 8);
-		
-		
-		// ignore all meta + keydown (Such as Command + S)
-		if (isMeta && (type == TouchPressType.DOWN)) return;		
+		//Boolean isAlt = ((modifiers & 0x08) == 8);	
 		
 		// manually map some special ctrl+keyevents
 		// TODO: make this not so brittle. incorporate this into a keymap?
@@ -740,6 +735,10 @@ public class MonkeyBoard {
 		
 		// still null? nothing to do here
 		if ( code == null ) return;
+		
+		// ignore all meta + keydown (Such as Command + S)
+		// TODO: also ignore keyups if they're not in keysPressed
+		if (isMeta && (type == TouchPressType.DOWN)) return;	
 		
 		// if it's a keydown and there's already a reference in keysPressed, don't send another keydown 
 		if ((! code.contains("DPAD")) &&
@@ -962,6 +961,7 @@ public class MonkeyBoard {
 				// Show a file chooser dialog and
 				// issue an adb install command if the filepath
 				// return contains '.apk'
+				// TODO: convert to portable JFileChooser
 				FileDialog fd = new FileDialog(frmMonkeyboard, "Select an .apk package to install");
 				fd.show();
 				String apk = fd.getDirectory() + fd.getFile();
