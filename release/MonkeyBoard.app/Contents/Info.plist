@@ -7,7 +7,7 @@
 	<key>CFBundleIdentifier</key>
 	<string>net.brtly.monkeyboard.MonkeyBoard</string>
 	<key>CFBundleVersion</key>
-	<string>0.1.5</string>
+	<string>0.1.6</string>
 	<key>CFBundleAllowMixedLocalizations</key>
 	<string>true</string>
 	<key>CFBundleExecutable</key>
@@ -19,7 +19,7 @@
 	<key>CFBundleSignature</key>
 	<string>????</string>
 	<key>CFBundleGetInfoString</key>
-	<string>Managment console and keyboard driver for Android devices</string>
+	<string>MonkeyBoard version 0.1</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleIconFile</key>

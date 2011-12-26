@@ -106,15 +106,25 @@ public class MonkeyBoard {
     private static String androidSdkAdbPath = null;
     private static String androidSdkEmulatorPath = null;
     
-    private static final String MOTD = "MonkeyBoard © 2011 Oliver Bartley";
-    private static final String HELP_TEXT = "Special keys:\n" +
+    private static final String MOTD = "MonkeyBoard v0.1";
+    private static final String CONSOLE_SEPARATOR = "---------\n";
+    private static final String HELP_TEXT = ">>> USAGE\n" +
+    				CONSOLE_SEPARATOR +
+    				"Special key combos:\n" +
     				"Home          Ctrl+H\n" +
     	    		"Menu          Ctrl+M\n" +
     	    		"Search        Ctrl+S\n" +
     				"Camera        Ctrl+C (Ctrl+F3)\n" +
 		    		"Volume up     Ctrl+= (Ctrl+F5)\n" +
 		    		"Volume down   Ctrl+- (Ctrl+F6)\n" +
-		    		"Dpad center   Ctrl+Enter";
+		    		"Dpad center   Ctrl+Enter\n" +
+		    		CONSOLE_SEPARATOR +
+		    		"adb commands executed from the 'Execute adb Command...' option\n" +
+		    		"follow the pattern:\n" +
+		    		"	adb -s $(device id) $(command)\n" +
+		    		"where $(device id) represents the currently connected device's serial number\n" +
+		    		"and $(command) represents the command entered into the input dialog.\n" +
+		    		CONSOLE_SEPARATOR;
 		  
     private static final long TIMEOUT = 5000;
     private static final int REFRESH_DELAY = 1000;
@@ -183,6 +193,9 @@ public class MonkeyBoard {
 	 * works by deleting the config file and calling the initSdkPath usually only run at launch
 	 */
 	private void resetSdkPath() {
+		
+		disconnectFromDevice();
+		
 		try {
 			File confFile = null;
 			String confPath = System.getenv("HOME") + "/.monkeyboard";
@@ -191,7 +204,10 @@ public class MonkeyBoard {
 		} catch (Exception e) {
 			toConsole("there was an error removing ~/.monkeyboard");
 		}
+		
 		initSdkPath();
+		toConsole("stopping adb server...");
+		execAdbCommand("kill-server");
 	}
 	
 	/**
@@ -285,8 +301,9 @@ public class MonkeyBoard {
 			Document d = textConsole.getDocument();
 			SimpleAttributeSet attributes = new SimpleAttributeSet();
 			d.insertString(d.getLength(), '\n' + arg0, attributes);
+			textConsole.invalidate(); // force update of console to reduce forced scrolling issues
 			// force scrolling to end of output
-			textConsole.scrollRectToVisible(new Rectangle(0, textConsole.getHeight()-2, 1, 1));
+			textConsole.scrollRectToVisible(new Rectangle(0, textConsole.getHeight() + 32, 1, 1));
 		} catch (Exception e) {
 			System.err.println("Error instering:" + arg0);
 			e.printStackTrace();
@@ -923,7 +940,8 @@ public class MonkeyBoard {
 		btnMonkeyBoard.addFocusListener(new FocusAdapter() {
 			@Override
 			public void focusLost(FocusEvent arg0) {
-				toConsole("key events released");
+				if (chckbxmntmShowKeyEvents.isSelected()) 
+					toConsole("key events released");
 				btnMonkeyBoard.setSelected(false);
 				resetKeysPressed();
 			}
@@ -931,11 +949,13 @@ public class MonkeyBoard {
 			public void focusGained(FocusEvent arg0) {
 				if (connectedDeviceId == null) {
 					// give focus to the console, don't trap input
-					toConsole("no connected device");
+					toConsole("no connected device!");
+					
 					textConsole.requestFocus();
 				} else {
 					// begin trapping key events
-					toConsole("key events trapped");
+					if (chckbxmntmShowKeyEvents.isSelected()) 
+						toConsole("key events trapped");
 					btnMonkeyBoard.setSelected(true);
 				}
 			}
@@ -1000,8 +1020,8 @@ public class MonkeyBoard {
 		JMenu mnMain = new JMenu("Device");
 		menuBar.add(mnMain);
 		
-		JMenuItem mntmRestartAdbServer = new JMenuItem("Restart adb server");
-		mntmRestartAdbServer.addActionListener(new ActionListener() {
+		JMenuItem mntmStopAdbServer = new JMenuItem("Restart adb Server");
+		mntmStopAdbServer.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent arg0) {
 				disconnectFromDevice();
 				execAdbCommand("kill-server");
@@ -1009,8 +1029,6 @@ public class MonkeyBoard {
 				// nest just wait till refresh device list comes around again
 			}
 		});
-		mntmRestartAdbServer.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_R, InputEvent.META_MASK));
-		mnMain.add(mntmRestartAdbServer);		
 		
 		JMenuItem mntmConnectToDevice = new JMenuItem("Connect To Device");
 		mntmConnectToDevice.addActionListener(new ActionListener() {
@@ -1018,8 +1036,10 @@ public class MonkeyBoard {
 				connectToDevice();
 			}
 		});
-		mntmConnectToDevice.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_N, InputEvent.META_MASK));
+		mntmConnectToDevice.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_D, InputEvent.META_MASK));
 		mnMain.add(mntmConnectToDevice);
+		mntmStopAdbServer.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_R, InputEvent.META_MASK));
+		mnMain.add(mntmStopAdbServer);		
 		
 		JSeparator separator = new JSeparator();
 		mnMain.add(separator);
@@ -1062,7 +1082,7 @@ public class MonkeyBoard {
 		
 		JMenuItem mntmExecuteShellCommand = new JMenuItem("Execute adb Command...");
 		mntmExecuteShellCommand.setEnabled(false);
-		mntmExecuteShellCommand.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_X, InputEvent.META_MASK));
+		mntmExecuteShellCommand.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_A, InputEvent.META_MASK));
 		mntmExecuteShellCommand.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent arg0) {
 				Component source = (Component) arg0.getSource();
@@ -1098,9 +1118,6 @@ public class MonkeyBoard {
 		mnMain.add(mntmSaveScreenshot);
 		deviceMenuItems.add(mntmSaveScreenshot);
 		
-		JMenuItem mntmSaveScreenshotAs = new JMenuItem("Save Screenshot As...");
-		mntmSaveScreenshotAs.setVisible(false);
-		
 		JMenuItem mntmSaveLogcat = new JMenuItem("Save Logcat");
 		mntmSaveLogcat.setEnabled(false);
 		mntmSaveLogcat.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_L, InputEvent.META_MASK));
@@ -1112,23 +1129,18 @@ public class MonkeyBoard {
 		deviceMenuItems.add(mntmSaveLogcat);
 		
 		mnMain.add(mntmSaveLogcat);
-		mntmSaveScreenshotAs.setEnabled(false);
-		mntmSaveScreenshotAs.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_A, Event.META_MASK));
-		mnMain.add(mntmSaveScreenshotAs);
-		deviceMenuItems.add(mntmSaveScreenshotAs);
-		
-		JMenuItem mntmDisplayScreenshot = new JMenuItem("Display Screenshot...");
-		mntmDisplayScreenshot.setVisible(false);
-		mntmDisplayScreenshot.setEnabled(false);
-		mntmDisplayScreenshot.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_D, InputEvent.META_MASK));
-		mnMain.add(mntmDisplayScreenshot);
-		deviceMenuItems.add(mntmDisplayScreenshot);
 		
 		JMenu mnOptions = new JMenu("Options");
 		menuBar.add(mnOptions);
 		
 		// class level declaration
-		chckbxmntmShowKeyEvents = new JCheckBoxMenuItem("Show Key Events in Console");
+		chckbxmntmShowKeyEvents = new JCheckBoxMenuItem("Show Key Log in Console");
+		chckbxmntmShowKeyEvents.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent arg0) {
+			toConsole("keylog:" + (Boolean.toString(chckbxmntmShowKeyEvents.isSelected())));
+			}
+		});
+		chckbxmntmShowKeyEvents.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_K, InputEvent.META_MASK));
 		chckbxmntmShowKeyEvents.setSelected(true);
 		mnOptions.add(chckbxmntmShowKeyEvents);
 		
@@ -1140,6 +1152,7 @@ public class MonkeyBoard {
 		});
 		
 		JMenuItem mntmConsoleHelp = new JMenuItem("Send Help Text to Console");
+		mntmConsoleHelp.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_SLASH, InputEvent.META_MASK));
 		mntmConsoleHelp.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
 				toConsole(HELP_TEXT);
