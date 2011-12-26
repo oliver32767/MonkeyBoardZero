@@ -206,8 +206,17 @@ public class MonkeyBoard {
 		}
 		
 		initSdkPath();
-		toConsole("stopping adb server...");
-		execAdbCommand("kill-server");
+		if (JOptionPane.showOptionDialog (this.frmMonkeyboard,	    	
+			    "A restart is required for these changes to take effect. Quit now?",
+			    "SDK Path Updated",
+			    JOptionPane.YES_NO_OPTION,
+			    JOptionPane.WARNING_MESSAGE, null, null, null) == JOptionPane.YES_OPTION) {
+			disconnectFromDevice();
+			System.exit(0);
+		}
+		
+		
+		
 	}
 	
 	/**
@@ -241,8 +250,8 @@ public class MonkeyBoard {
 	    		// can't find!
 				// show a dialog
 				JOptionPane.showMessageDialog(this.frmMonkeyboard,	    	
-					    "Cannot locate Android SDK. Please try again!",
-					    "GAME OVER",
+					    "Cannot locate Android SDK. Please restart MonkeyBoard to update your SDK Path settings.",
+					    "SDK Path Error",
 					    JOptionPane.ERROR_MESSAGE);
 				// delete the config file to force a new path selection next launch
 				confFile.delete();
@@ -263,8 +272,8 @@ public class MonkeyBoard {
     		// can't find!
 			// show a dialog
 			JOptionPane.showMessageDialog(this.frmMonkeyboard,	    	
-				    "Cannot locate Android SDK. Please try again!",
-				    "GAME OVER",
+				    "Cannot locate Android SDK. Please restart MonkeyBoard to update your SDK Path settings.",
+				    "SDK Path Error",
 				    JOptionPane.ERROR_MESSAGE);
 			// delete the config file to force a new path selection next launch
 			confFile.delete();
@@ -555,8 +564,8 @@ public class MonkeyBoard {
 			try {
 				v = (HashMap<String, String>) listView.getSelectedValue();	
 				deviceId = v.get("deviceId");
-			} catch (Exception ex) {
-				ex.printStackTrace();
+			} catch (NullPointerException ex) {
+				// an npe is fine, it just means there's nothing selected
 				disconnectFromDevice();
 				refreshDeviceList();
 				return null;
@@ -594,7 +603,10 @@ public class MonkeyBoard {
 	 * handles disposing of connection object and disabling menu items that require a connected device
 	 */
 	private void disconnectFromDevice() {
-		connectedDeviceId = null;
+		if (connectedDeviceId != null) {
+			toConsole("diconnected from device:" + connectedDeviceId);
+			connectedDeviceId = null;
+		}
 		if (mDevice != null) {
 			mDevice.dispose();
 			mDevice = null;
@@ -940,18 +952,19 @@ public class MonkeyBoard {
 		btnMonkeyBoard.addFocusListener(new FocusAdapter() {
 			@Override
 			public void focusLost(FocusEvent arg0) {
-				if (chckbxmntmShowKeyEvents.isSelected()) 
+				if (chckbxmntmShowKeyEvents.isSelected() &&
+						( ! (connectedDeviceId == null))) 
 					toConsole("key events released");
 				btnMonkeyBoard.setSelected(false);
 				resetKeysPressed();
 			}
 			@Override
 			public void focusGained(FocusEvent arg0) {
+				// if we try to connect here, we run into a wierd hang.
+				// don't try to be convenient an add connectToDevice() here!
 				if (connectedDeviceId == null) {
-					// give focus to the console, don't trap input
-					toConsole("no connected device!");
-					
-					textConsole.requestFocus();
+					listView.requestFocus();
+					toConsole("no device connected!");
 				} else {
 					// begin trapping key events
 					if (chckbxmntmShowKeyEvents.isSelected()) 
@@ -1020,7 +1033,7 @@ public class MonkeyBoard {
 		JMenu mnMain = new JMenu("Device");
 		menuBar.add(mnMain);
 		
-		JMenuItem mntmStopAdbServer = new JMenuItem("Restart adb Server");
+		JMenuItem mntmStopAdbServer = new JMenuItem("Kill adb Server");
 		mntmStopAdbServer.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent arg0) {
 				disconnectFromDevice();
@@ -1038,7 +1051,7 @@ public class MonkeyBoard {
 		});
 		mntmConnectToDevice.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_D, InputEvent.META_MASK));
 		mnMain.add(mntmConnectToDevice);
-		mntmStopAdbServer.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_R, InputEvent.META_MASK));
+		mntmStopAdbServer.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_UNDEFINED, 0));
 		mnMain.add(mntmStopAdbServer);		
 		
 		JSeparator separator = new JSeparator();
@@ -1049,7 +1062,9 @@ public class MonkeyBoard {
 			public void actionPerformed(ActionEvent arg0) {
 				Component source = (Component) arg0.getSource();
 				String avd = JOptionPane.showInputDialog(source,
-		                "Enter the name of the AVD you want to lauch:");
+		                "Enter the name of the AVD you want to lauch:",
+		                "Launch Emulator",
+		                JOptionPane.QUESTION_MESSAGE);
 				startAvd(avd);
 			}
 		});
@@ -1058,9 +1073,9 @@ public class MonkeyBoard {
 		
 		mnMain.add(new JSeparator());
 		
-		JMenuItem mntmInstallapk = new JMenuItem("Install *.apk...");
+		JMenuItem mntmInstallapk = new JMenuItem("Install *.apk Package...");
 		mntmInstallapk.setEnabled(false);
-		mntmInstallapk.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_I, InputEvent.META_MASK));
+		mntmInstallapk.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_P, InputEvent.META_MASK));
 		mntmInstallapk.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent arg0) {
 				// Show a file chooser dialog and
@@ -1080,28 +1095,30 @@ public class MonkeyBoard {
 		mnMain.add(mntmInstallapk);
 		deviceMenuItems.add(mntmInstallapk);
 		
-		JMenuItem mntmExecuteShellCommand = new JMenuItem("Execute adb Command...");
+		JMenuItem mntmExecuteShellCommand = new JMenuItem("Run adb Command...");
 		mntmExecuteShellCommand.setEnabled(false);
-		mntmExecuteShellCommand.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_A, InputEvent.META_MASK));
+		mntmExecuteShellCommand.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_R, InputEvent.META_MASK));
 		mntmExecuteShellCommand.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent arg0) {
 				Component source = (Component) arg0.getSource();
 				String cmd = JOptionPane.showInputDialog(source,
-		                "Enter adb command:");
+						"adb -s " + connectedDeviceId, // this could potentially be a NullPointer, but the menu items are disabled when connectedDeviceId == null
+						"Run adb Command",
+						JOptionPane.INFORMATION_MESSAGE);
 				execAdbCommand(cmd);
 			}
 		});
 		mnMain.add(mntmExecuteShellCommand);
 		deviceMenuItems.add(mntmExecuteShellCommand);
 		
-		JMenuItem mntmGetDeviceProperties = new JMenuItem("Get Device Properties");
+		JMenuItem mntmGetDeviceProperties = new JMenuItem("Get Device Info");
 		mntmGetDeviceProperties.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent arg0) {
 				getDeviceProperties();
 			}
 		});
 		mntmGetDeviceProperties.setEnabled(false);
-		mntmGetDeviceProperties.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_P, InputEvent.META_MASK));
+		mntmGetDeviceProperties.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_I, InputEvent.META_MASK));
 		mnMain.add(mntmGetDeviceProperties);
 		deviceMenuItems.add(mntmGetDeviceProperties);
 		
@@ -1137,15 +1154,18 @@ public class MonkeyBoard {
 		chckbxmntmShowKeyEvents = new JCheckBoxMenuItem("Show Key Log in Console");
 		chckbxmntmShowKeyEvents.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent arg0) {
-			toConsole("keylog:" + (Boolean.toString(chckbxmntmShowKeyEvents.isSelected())));
+				if (chckbxmntmShowKeyEvents.isSelected())
+					toConsole("[-:-] KEYLOG ON");
+				else
+					toConsole("[-:-] KEYLOG OFF");
 			}
 		});
 		chckbxmntmShowKeyEvents.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_K, InputEvent.META_MASK));
 		chckbxmntmShowKeyEvents.setSelected(true);
 		mnOptions.add(chckbxmntmShowKeyEvents);
 		
-		JMenuItem mntmConfigureAndroidSdk = new JMenuItem("Configure Android SDK path...");
-		mntmConfigureAndroidSdk.addActionListener(new ActionListener() {
+		JMenuItem mntmResetSdkPath = new JMenuItem("Set Android SDK Path...");
+		mntmResetSdkPath.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent arg0) {
 			resetSdkPath();
 			}
@@ -1167,7 +1187,7 @@ public class MonkeyBoard {
 			}
 		});
 		mnOptions.add(mntmClearConsole);
-		mnOptions.add(mntmConfigureAndroidSdk);
+		mnOptions.add(mntmResetSdkPath);
 	}
 	
 	public void initializeKeyCodeMap() {
