@@ -1159,6 +1159,14 @@ public class MonkeyBoard {
 			}
 		});
 		mnOptions.add(mntmConsoleHelp);
+		
+		JMenuItem mntmClearConsole = new JMenuItem("Flush Scrollback Buffer");
+		mntmClearConsole.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				textConsole.setText(MOTD);
+			}
+		});
+		mnOptions.add(mntmClearConsole);
 		mnOptions.add(mntmConfigureAndroidSdk);
 	}
 	
