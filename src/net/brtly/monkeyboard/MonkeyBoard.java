@@ -329,11 +329,14 @@ public class MonkeyBoard {
 		    public Object doInBackground() {
 				Runtime run = Runtime.getRuntime();
 				Process pr = null;
+				String cmd = null;
 				
 				if (args == null) return null;
-				if (connectedDeviceId == null) return null;
-				
-				String cmd = androidSdkAdbPath + " -s " + connectedDeviceId + " " + args;
+				if (connectedDeviceId == null) 
+					// this is really only an option so restarting adb can use this function
+					cmd = androidSdkAdbPath + " " + args;
+				else 
+					cmd = androidSdkAdbPath + " -s " + connectedDeviceId + " " + args;
 				toConsole(">>> " + cmd);
 				
 				// execute cmd
@@ -980,6 +983,13 @@ public class MonkeyBoard {
 		menuBar.add(mnFile);
 		
 		JMenuItem mntmRestartAdbServer = new JMenuItem("Restart adb server");
+		mntmRestartAdbServer.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent arg0) {
+				disconnectFromDevice();
+				execAdbCommand("kill-server");
+				execAdbCommand("start-server");
+			}
+		});
 		mntmRestartAdbServer.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_R, InputEvent.META_MASK));
 		mnFile.add(mntmRestartAdbServer);		
 		
