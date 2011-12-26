@@ -226,6 +226,7 @@ public class MonkeyBoard {
 	private void initSdkPath() {
 		File confFile = null;
 		String confPath = System.getenv("HOME") + "/.monkeyboard";
+		JFrame frm = new JFrame();
 		try {
 			// try loading from config file
 			confFile = new File(confPath);
@@ -234,7 +235,7 @@ public class MonkeyBoard {
 			androidSdkPath = confScanner.nextLine(); // THIS ASSUMES THERE IS ONLY ONE LINE CONTAINING THE SDK PATH!
 		} catch (Exception e) {
 			// show a dialog and directory chooser
-			JOptionPane.showMessageDialog(this.frmMonkeyboard,	    	
+			JOptionPane.showMessageDialog(frm,	    	
 				    "Select the root directory of your SDK installation.",
 				    "MonkeyBoard Setup",
 				    JOptionPane.INFORMATION_MESSAGE);
@@ -249,7 +250,7 @@ public class MonkeyBoard {
 			} catch ( NullPointerException npe) {
 	    		// can't find!
 				// show a dialog
-				JOptionPane.showMessageDialog(this.frmMonkeyboard,	    	
+				JOptionPane.showMessageDialog(frm,	    	
 					    "Cannot locate Android SDK. Please restart MonkeyBoard to update your SDK Path settings.",
 					    "SDK Path Error",
 					    JOptionPane.ERROR_MESSAGE);
@@ -271,7 +272,7 @@ public class MonkeyBoard {
     	if ( ! adbBin.exists() ) {
     		// can't find!
 			// show a dialog
-			JOptionPane.showMessageDialog(this.frmMonkeyboard,	    	
+			JOptionPane.showMessageDialog(frmMonkeyboard,	    	
 				    "Cannot locate Android SDK. Please restart MonkeyBoard to update your SDK Path settings.",
 				    "SDK Path Error",
 				    JOptionPane.ERROR_MESSAGE);
