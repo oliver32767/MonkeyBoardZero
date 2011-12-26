@@ -1,3 +1,13 @@
+# Project Specific Files #
+##########################
+.classpath
+.project
+bin/*
+
+!pkg/MonkeyBoard.app/Contents/Resources/Java/MonkeyBoard.jar
+!forms-1.3.0*
+!jar-in-jar-loader.zip
+
 # Compiled source #
 ###################
 *.com
@@ -32,3 +42,5 @@
 ehthumbs.db
 Icon?
 Thumbs.db
+
+
