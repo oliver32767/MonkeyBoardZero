@@ -583,6 +583,9 @@ public class MonkeyBoard {
 			mDevice = null;
 		}
 		setDeviceMenuItemsEnabled(false);
+		// keep the focus request within the window, other wise focus will jump from
+		// input dialogs as well.
+		textConsole.requestFocusInWindow();
 	}
 	
 	/**
