@@ -66,7 +66,6 @@ import java.awt.Font;
 import javax.swing.JScrollPane;
 import java.awt.event.InputEvent;
 import java.awt.Color;
-import java.awt.Toolkit;
 import javax.swing.JCheckBoxMenuItem;
 
 public class MonkeyBoard {
@@ -86,21 +85,21 @@ public class MonkeyBoard {
     private IChimpDevice mDevice; 
     private String connectedDeviceId = null;
     private String desktopPath;
-    
-	
+   
     private static String androidSdkPath = null;
     private static String androidSdkAdbPath = null;
     private static String androidSdkEmulatorPath = null;
     
-    private static String MOTD = "This software is provided " + '"' + "AS IS" + '"' + " and any expressed or implied warranties,\n" +
-    		"including, but not limited to, the implied warranties of merchantability\n" +
-    		"and fitness for a particular purpose are disclaimed. Have a nice day.\n" +
-    		"MonkeyBoard © 2011 Oliver Bartley";
-    		
-    		//THIS SOFTWARE IS PROVIDED "AS IS" AND ANY EXPRESSED OR IMPLIED WARRANTIES, 
-    		// INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY 
-    		// AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
-    
+    private static final String MOTD = "MonkeyBoard © 2011 Oliver Bartley";
+    private static final String HELP_TEXT = "Special keys:\n" +
+    				"Home          Ctrl+H\n" +
+    	    		"Menu          Ctrl+M\n" +
+    	    		"Search        Ctrl+S\n" +
+    				"Camera        Ctrl+C (Ctrl+F3)\n" +
+		    		"Volume up     Ctrl+= (Ctrl+F5)\n" +
+		    		"Volume down   Ctrl+- (Ctrl+F6)\n" +
+		    		"Dpad center   Ctrl+Enter";
+		  
     private static final long TIMEOUT = 5000;
     private static final int REFRESH_DELAY = 1000;
     // ddms default filename == "device-2011-12-23-160423.png"
@@ -979,8 +978,8 @@ public class MonkeyBoard {
 		menuBar.setBorder(null);
 		frmMonkeyboard.setJMenuBar(menuBar);
 		
-		JMenu mnFile = new JMenu("File");
-		menuBar.add(mnFile);
+		JMenu mnMain = new JMenu("Device");
+		menuBar.add(mnMain);
 		
 		JMenuItem mntmRestartAdbServer = new JMenuItem("Restart adb server");
 		mntmRestartAdbServer.addActionListener(new ActionListener() {
@@ -991,7 +990,7 @@ public class MonkeyBoard {
 			}
 		});
 		mntmRestartAdbServer.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_R, InputEvent.META_MASK));
-		mnFile.add(mntmRestartAdbServer);		
+		mnMain.add(mntmRestartAdbServer);		
 		
 		JMenuItem mntmConnectToDevice = new JMenuItem("Connect To Device");
 		mntmConnectToDevice.addActionListener(new ActionListener() {
@@ -1000,10 +999,10 @@ public class MonkeyBoard {
 			}
 		});
 		mntmConnectToDevice.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_N, InputEvent.META_MASK));
-		mnFile.add(mntmConnectToDevice);
+		mnMain.add(mntmConnectToDevice);
 		
 		JSeparator separator = new JSeparator();
-		mnFile.add(separator);
+		mnMain.add(separator);
 		
 		JMenuItem mntmLaunchEmulator = new JMenuItem("Launch Emulator...");
 		mntmLaunchEmulator.addActionListener(new ActionListener() {
@@ -1015,9 +1014,9 @@ public class MonkeyBoard {
 			}
 		});
 		mntmLaunchEmulator.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_E, InputEvent.META_MASK));
-		mnFile.add(mntmLaunchEmulator);
+		mnMain.add(mntmLaunchEmulator);
 		
-		mnFile.add(new JSeparator());
+		mnMain.add(new JSeparator());
 		
 		JMenuItem mntmInstallapk = new JMenuItem("Install *.apk...");
 		mntmInstallapk.setEnabled(false);
@@ -1038,7 +1037,7 @@ public class MonkeyBoard {
 			}
 		});
 		
-		mnFile.add(mntmInstallapk);
+		mnMain.add(mntmInstallapk);
 		deviceMenuItems.add(mntmInstallapk);
 		
 		JMenuItem mntmExecuteShellCommand = new JMenuItem("Execute adb Command...");
@@ -1052,7 +1051,7 @@ public class MonkeyBoard {
 				execAdbCommand(cmd);
 			}
 		});
-		mnFile.add(mntmExecuteShellCommand);
+		mnMain.add(mntmExecuteShellCommand);
 		deviceMenuItems.add(mntmExecuteShellCommand);
 		
 		JMenuItem mntmGetDeviceProperties = new JMenuItem("Get Device Properties");
@@ -1063,10 +1062,10 @@ public class MonkeyBoard {
 		});
 		mntmGetDeviceProperties.setEnabled(false);
 		mntmGetDeviceProperties.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_P, InputEvent.META_MASK));
-		mnFile.add(mntmGetDeviceProperties);
+		mnMain.add(mntmGetDeviceProperties);
 		deviceMenuItems.add(mntmGetDeviceProperties);
 		
-		mnFile.add(new JSeparator());
+		mnMain.add(new JSeparator());
 		
 		JMenuItem mntmSaveScreenshot = new JMenuItem("Save Screenshot");
 		mntmSaveScreenshot.addActionListener(new ActionListener() {
@@ -1076,7 +1075,7 @@ public class MonkeyBoard {
 		});
 		mntmSaveScreenshot.setEnabled(false);
 		mntmSaveScreenshot.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_S, Event.META_MASK));
-		mnFile.add(mntmSaveScreenshot);
+		mnMain.add(mntmSaveScreenshot);
 		deviceMenuItems.add(mntmSaveScreenshot);
 		
 		JMenuItem mntmSaveScreenshotAs = new JMenuItem("Save Screenshot As...");
@@ -1092,17 +1091,17 @@ public class MonkeyBoard {
 		});
 		deviceMenuItems.add(mntmSaveLogcat);
 		
-		mnFile.add(mntmSaveLogcat);
+		mnMain.add(mntmSaveLogcat);
 		mntmSaveScreenshotAs.setEnabled(false);
 		mntmSaveScreenshotAs.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_A, Event.META_MASK));
-		mnFile.add(mntmSaveScreenshotAs);
+		mnMain.add(mntmSaveScreenshotAs);
 		deviceMenuItems.add(mntmSaveScreenshotAs);
 		
 		JMenuItem mntmDisplayScreenshot = new JMenuItem("Display Screenshot...");
 		mntmDisplayScreenshot.setVisible(false);
 		mntmDisplayScreenshot.setEnabled(false);
 		mntmDisplayScreenshot.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_D, InputEvent.META_MASK));
-		mnFile.add(mntmDisplayScreenshot);
+		mnMain.add(mntmDisplayScreenshot);
 		deviceMenuItems.add(mntmDisplayScreenshot);
 		
 		JMenu mnOptions = new JMenu("Options");
@@ -1119,6 +1118,14 @@ public class MonkeyBoard {
 			resetSdkPath();
 			}
 		});
+		
+		JMenuItem mntmConsoleHelp = new JMenuItem("Send Help Text to Console");
+		mntmConsoleHelp.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				toConsole(HELP_TEXT);
+			}
+		});
+		mnOptions.add(mntmConsoleHelp);
 		mnOptions.add(mntmConfigureAndroidSdk);
 	}
 	
