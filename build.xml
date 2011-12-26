@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<project default="create_run_jar" name="Create Runnable Jar for Project MonkeyBoard">
+    <!--this file was created by Eclipse Runnable JAR Export Wizard-->
+    <!--ANT 1.7 is required                                        -->
+    <target name="create_run_jar">
+        <jar destfile="/Users/obartley/Projects/MonkeyBoard/bin/MonkeyBoard.jar" filesetmanifest="mergewithoutmain">
+            <manifest>
+                <attribute name="Main-Class" value="net.brtly.monkeyboard.MonkeyBoard"/>
+                <attribute name="Class-Path" value="."/>
+            </manifest>
+            <fileset dir="/Users/obartley/Projects/MonkeyBoard/bin"/>
+            <zipfileset excludes="META-INF/*.SF" src="/Users/obartley/Library/android-sdk-macosx/tools/lib/chimpchat.jar"/>
+            <zipfileset excludes="META-INF/*.SF" src="/Users/obartley/Library/android-sdk-macosx/tools/lib/ddmlib.jar"/>
+            <zipfileset excludes="META-INF/*.SF" src="/Users/obartley/Library/android-sdk-macosx/tools/lib/guavalib.jar"/>
+            <zipfileset excludes="META-INF/*.SF" src="/Users/obartley/Library/android-sdk-macosx/tools/lib/androidprefs.jar"/>
+            <zipfileset excludes="META-INF/*.SF" src="/Users/obartley/Library/android-sdk-macosx/tools/lib/common.jar"/>
+            <zipfileset excludes="META-INF/*.SF" src="/Users/obartley/Library/android-sdk-macosx/tools/lib/mkidentity.jar"/>
+            <zipfileset excludes="META-INF/*.SF" src="/Users/obartley/Library/android-sdk-macosx/tools/lib/commons-compress-1.0.jar"/>
+            <zipfileset excludes="META-INF/*.SF" src="/Users/obartley/Library/android-sdk-macosx/tools/lib/httpclient-4.1.1.jar"/>
+            <zipfileset excludes="META-INF/*.SF" src="/Users/obartley/Library/android-sdk-macosx/tools/lib/httpcore-4.1.jar"/>
+            <zipfileset excludes="META-INF/*.SF" src="/Users/obartley/Library/android-sdk-macosx/tools/lib/httpmime-4.1.1.jar"/>
+            <zipfileset excludes="META-INF/*.SF" src="/Users/obartley/Library/android-sdk-macosx/tools/lib/commons-logging-1.1.1.jar"/>
+            <zipfileset excludes="META-INF/*.SF" src="/Users/obartley/Library/android-sdk-macosx/tools/lib/commons-codec-1.4.jar"/>
+            <zipfileset excludes="META-INF/*.SF" src="/Users/obartley/Library/android-sdk-macosx/tools/lib/sdklib.jar"/>
+        </jar>
+    </target>
+</project>
